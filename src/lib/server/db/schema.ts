@@ -17,7 +17,7 @@ export const courses = pgTable("courses", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   description: text("description"),
-  thumbnailUrl: text("thumbnail_url"),
+  thumbnailFileId: text("thumbnail_file_id"),
   instructorId: uuid("instructor_id").references(() => users.id),
   namespaceId: text("namespace_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -33,6 +33,7 @@ export const modules = pgTable("modules", {
   courseId: uuid("course_id").references(() => courses.id),
   title: text("title"),
   order: integer("order"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Videos
@@ -41,7 +42,7 @@ export const videos = pgTable("videos", {
   moduleId: uuid("module_id").references(() => modules.id),
   title: text("title"),
   description: text("description"),
-  folderId: text("folder_id"),
+  fileId: text("file_id"),
   resolutions: text("resolutions"), // e.g. "360p,720p,1080p"
   duration: integer("duration"), // in seconds
   createdAt: timestamp("created_at").defaultNow(),

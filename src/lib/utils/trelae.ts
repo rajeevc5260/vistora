@@ -3,8 +3,6 @@ import { env } from "$env/dynamic/public";
 
 const trelaeAPIKey = env.PUBLIC_TRELAE_API_KEY;
 
-console.log('Using Trelae API Key:', trelaeAPIKey);
-
 if (!trelaeAPIKey) {
     throw new Error('TRELAE_API_KEY is not set');
 }

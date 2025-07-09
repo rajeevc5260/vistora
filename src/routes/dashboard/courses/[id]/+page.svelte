@@ -17,14 +17,18 @@
         Users, 
         BookOpen, 
         Play,
-        Download,
         Eye,
         Calendar,
-        Settings
+        Settings,
+        Shapes
     } from "lucide-svelte";
+    import { formatDuration, formatTotalDuration } from "$lib/utils/formatTime";
+    import { loadVideoFromFirstLesson } from "$lib/utils/loadFirstVideo";
+    import * as Tooltip from "$lib/components/ui/tooltip/index.js";
+
 
     let { data }: PageProps = $props();
-    let { course } = data;
+    let { course, modules } = data;
 
     let title = $state(course.title);
     let description = $state(course.description || "");
@@ -57,25 +61,6 @@
         goto("/dashboard/courses");
     }
 
-    const modules = [
-        {
-            title: "Module 1: Getting Started",
-            lessons: [
-                { title: "Course Overview", duration: "4:20" },
-                { title: "Environment Setup", duration: "6:15" },
-                { title: "Hello World", duration: "3:10" },
-            ],
-        },
-        {
-            title: "Module 2: Components",
-            lessons: [
-                { title: "Component Structure", duration: "5:45" },
-                { title: "Props & State", duration: "7:00" },
-                { title: "Lifecycle", duration: "6:30" },
-            ],
-        },
-    ];
-
     const materials = [
         { name: "Course Outline.pdf", icon: FileText, link: "#" },
         { name: "Design Mockup.png", icon: ImageIcon, link: "#" },
@@ -91,8 +76,220 @@
         { id: "tools", label: "Learning Tools", icon: Settings },
     ];
 
-    const totalLessons = modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
-    const totalDuration = "2h 31m"; // This would be calculated from actual lesson durations
+    const totalLessons = data.modules.reduce((acc, mod) => acc + mod.lessons.length, 0);
+    const totalSeconds = data.modules.reduce((sum, mod) => {
+        return sum + mod.lessons.reduce((s, lesson) => s + (lesson.duration ?? 0), 0);
+    }, 0);
+
+    const totalDuration = formatTotalDuration(totalSeconds);
+
+    let newModuleTitle = $state('');
+
+    async function handleAddModule() {
+        console.log("started")
+        if (!newModuleTitle.trim()) return;
+
+        const res = await fetch(`/api/courses/${course.id}/modules`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: newModuleTitle }),
+        });
+
+        if (res.ok) {
+            const newModule = await res.json();
+
+            // modules.push(newModule);
+            // console.log("module", newModule)
+            newModuleTitle = '';
+            // Refresh the page data
+		    await goto(location.pathname, { invalidateAll: true });
+            toast.success('Module added');
+        } else {
+            toast.error('Failed to add module');
+        }
+    }
+
+    let selectedFile: File | null = $state(null);
+    let lessonTitle = $state('');
+    let lessonDescription = $state('');
+    let videoDuration = $state(0);
+
+	async function handleLessonUpload(moduleId: string) {
+        if (!selectedFile || !lessonTitle) return;
+
+        const toastId = toast.loading("Uploading lesson...", { duration: Infinity });
+
+        const dialogElement = document.querySelector(`#lesson-dialog-${moduleId}`) as HTMLElement;
+        if (dialogElement) dialogElement.click();
+
+        try {
+            const formData = new FormData();
+            formData.append("title", lessonTitle);
+            formData.append("file", selectedFile);
+
+            const res = await fetch(`/api/modules/${moduleId}/lessons`, {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!res.ok) throw new Error("Failed to initiate upload");
+
+            const { fileId, uploadId, partSize, partUrls, title } = await res.json();
+
+            let uploadedBytes = 0;
+            const totalSize = selectedFile.size;
+
+            for (const part of partUrls) {
+                const start = (part.partNumber - 1) * partSize;
+                const end = Math.min(start + partSize, selectedFile.size);
+                const chunk = selectedFile.slice(start, end);
+
+                const upload = await fetch(part.url, {
+                    method: "PUT",
+                    body: chunk,
+                    headers: {
+                        "Content-Type": selectedFile.type || "application/octet-stream",
+                    },
+                });
+
+                if (!upload.ok) throw new Error(`Failed to upload part ${part.partNumber}`);
+
+                part.etag = upload.headers.get("ETag")?.replaceAll('"', "") ?? "";
+
+                // Update uploaded bytes and progress
+                uploadedBytes += chunk.size;
+                const progress = Math.floor((uploadedBytes / totalSize) * 100);
+                toast.message("Uploading lesson...", {
+                    id: toastId,
+                    description: `Progress: ${progress}%`,
+                });
+            }
+
+            await fetch(`/api/modules/${moduleId}/lessons/complete`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    fileId,
+                    uploadId,
+                    parts: partUrls.map((p: { partNumber: any; etag: any }) => ({
+                        partNumber: p.partNumber,
+                        etag: p.etag,
+                    })),
+                    title,
+                    duration: videoDuration,
+                    description: lessonDescription,
+                }),
+            });
+
+            toast.success("Lesson uploaded successfully", { id: toastId });
+            selectedFile = null;
+            lessonTitle = "";
+            lessonDescription = "";
+
+            // Refresh page data
+            await goto(location.pathname, { invalidateAll: true });
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to upload lesson", { id: toastId });
+        }
+    }
+
+
+
+    let selectedVideoUrl: string | null = $state(null);
+    let loadingFileId:  string | null = $state(null);
+
+    // play pause
+    let currentPlayingVideoId: string | null = $state(null);
+    let videoElement: HTMLVideoElement | null = $state(null);
+    let videoPaused: boolean = $state(false);
+
+    // Enhanced handleLessonClick function
+    async function handleLessonClick(fileId: string) {
+        loadingFileId = fileId;
+        selectedVideoUrl = null;
+        currentPlayingVideoId = null;
+        videoPaused = false;
+        
+        try {
+            const res = await fetch(`/api/videos/${fileId}/download-url`);
+            const { url } = await res.json();
+            selectedVideoUrl = url;
+            currentPlayingVideoId = fileId;
+            
+            // Wait for video element to be available and play
+            setTimeout(() => {
+                const video = document.querySelector('video') as HTMLVideoElement;
+                if (video) {
+                    videoElement = video;
+                    setupVideoListeners();
+                    video.play();
+                    videoPaused = false;
+                }
+            }, 100);
+        } catch (error) {
+            toast.error('Failed to load video');
+            console.error('Error loading video:', error);
+        } finally {
+            loadingFileId = null;
+        }
+    }
+
+    // Pause video function
+    function handlePauseVideo() {
+        if (videoElement) {
+            videoElement.pause();
+            videoPaused = true;
+        }
+    }
+
+    // Resume video function
+    function handleResumeVideo() {
+        if (videoElement) {
+            videoElement.play();
+            videoPaused = false;
+        }
+    }
+
+    // Setup video event listeners to sync state
+    function setupVideoListeners() {
+        if (videoElement) {
+            // Remove existing listeners to avoid duplicates
+            videoElement.removeEventListener('pause', handleVideoPause);
+            videoElement.removeEventListener('play', handleVideoPlay);
+            videoElement.removeEventListener('ended', handleVideoEnd);
+            
+            // Add new listeners
+            videoElement.addEventListener('pause', handleVideoPause);
+            videoElement.addEventListener('play', handleVideoPlay);
+            videoElement.addEventListener('ended', handleVideoEnd);
+            videoElement.addEventListener('loadstart', handleVideoLoadStart);
+            videoElement.addEventListener('canplay', handleVideoCanPlay);
+        }
+    }
+
+    // Event handler functions
+    function handleVideoPause() {
+        videoPaused = true;
+    }
+
+    function handleVideoPlay() {
+        videoPaused = false;
+    }
+
+    function handleVideoEnd() {
+        currentPlayingVideoId = null;
+        videoPaused = false;
+        videoElement = null;
+    }
+
+    function handleVideoLoadStart() {
+        videoPaused = false;
+    }
+
+    function handleVideoCanPlay() {
+        videoPaused = false;
+    }
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -116,9 +313,33 @@
                         <Eye class="w-4 h-4" />
                         Preview
                     </Button>
+                    <!-- Module Creation Form -->
+                    <Dialog.Root>
+                        <Dialog.Trigger class={buttonVariants({ variant: "outline", size: "sm" })}
+                            > <Shapes class="w-4 h-4"/>Add Module</Dialog.Trigger
+                        >
+                        <Dialog.Content class="sm:max-w-[425px]">
+                            <Dialog.Header>
+                            <Dialog.Title>Add Module</Dialog.Title>
+                            <Dialog.Description>
+                                Add new module to your course. Click save when you're done.
+                            </Dialog.Description>
+                            </Dialog.Header>
+                            <div>
+                                <Input bind:value={newModuleTitle} placeholder="Module title (e.g. Introduction)" />
+                            </div>
+                            <Dialog.Footer>
+                                <Dialog.Close>
+                                    <Button class="w-full" type="submit" onclick={handleAddModule}>
+                                        Add Module
+                                    </Button>
+                                </Dialog.Close>
+                            </Dialog.Footer>
+                        </Dialog.Content>
+                    </Dialog.Root>
                     <Dialog.Root>
                         <Dialog.Trigger class={buttonVariants({ variant: "default", size: "sm" })}>
-                            <Pen class="w-4 h-4 mr-2" />
+                            <Pen class="w-4 h-4" />
                             Edit Course
                         </Dialog.Trigger>
 
@@ -156,10 +377,11 @@
                                         />
                                     </div>
                                 </div>
-
-                                <Button class="w-full" onclick={handleUpdate}>
-                                    Save Changes
-                                </Button>
+                                <Dialog.Footer class="w-full">
+                                    <Button type="submit" class="w-full" onclick={handleUpdate}>
+                                        Save Changes
+                                    </Button>
+                                </Dialog.Footer>
                             </div>
                         </Dialog.Content>
                     </Dialog.Root>
@@ -176,17 +398,49 @@
                 <!-- Video/Thumbnail Section -->
                 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
                     <div class="aspect-video bg-gray-900 relative group">
-                        <img
-                            src={showPreview ? course.thumbnailUrl : fallbackImage}
-                            alt="Course Thumbnail"
-                            class="w-full h-full object-cover"
-                        />
-                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <button class="bg-white hover:bg-gray-100 rounded-full p-6 shadow-xl transition-all transform hover:scale-105">
-                                <Play class="w-8 h-8 text-gray-900 ml-1" />
-                            </button>
-                        </div>
+                        {#if selectedVideoUrl}
+                            <video
+                                controls
+                                autoplay
+                                bind:this={videoElement}
+                                onpause={handleVideoPause}
+                                onplay={handleVideoPlay}
+                                onended={handleVideoEnd}
+                                onloadstart={handleVideoLoadStart}
+                                oncanplay={handleVideoCanPlay}
+                                class="w-full h-full object-cover"
+                            >
+                                <source src={selectedVideoUrl} type="video/mp4" />
+                                <track kind="captions" label="English captions" src="" srclang="en" default />
+                                Your browser does not support the video tag.
+                            </video>
+                        {:else}
+                            <img
+                                src={showPreview ? course.thumbnailUrl : fallbackImage}
+                                alt="Course Thumbnail"
+                                class="w-full h-full object-cover"
+                            />
+                            <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                {#if loadingFileId}
+                                    <div class="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                                {:else}
+                                    <button
+                                            onclick={() =>
+                                                loadVideoFromFirstLesson(
+                                                    data.modules,
+                                                    (url) => selectedVideoUrl = url,
+                                                    (id) => loadingFileId = id,
+                                                    (id) => currentPlayingVideoId = id
+                                                )
+                                            }
+                                        class="bg-white hover:bg-gray-100 rounded-full p-6 shadow-xl transition-all transform hover:scale-105">
+                                        <Play class="w-8 h-8 text-gray-900 ml-1" />
+                                    </button>
+                                {/if}
+                            </div>
+                        {/if}
                     </div>
+
 
                     <!-- Course Stats -->
                     <div class="p-6 border-b">
@@ -248,70 +502,303 @@
                 <div class="bg-white rounded-2xl shadow-sm sticky top-24">
                     <div class="p-6 border-b">
                         <h2 class="text-xl font-semibold text-gray-900 mb-2">Course Content</h2>
-                        <p class="text-sm text-gray-600">{modules.length} modules • {totalLessons} lessons • {totalDuration}</p>
+                        <p class="text-sm text-gray-600">{data.modules.length} modules • {totalLessons} lessons • {totalDuration}</p>
                     </div>
 
                     <div class="max-h-[500px] overflow-y-auto">
-                        <Accordion.Root type="multiple" class="w-full">
-                            {#each modules as mod, i}
+                       <Accordion.Root type="multiple" class="w-full">
+                            {#each data.modules as mod, i}
                                 <Accordion.Item value={`module-${i}`} class="border-b last:border-b-0">
                                     <Accordion.Trigger class="px-6 py-4 hover:bg-gray-50 text-left w-full">
                                         <div class="flex items-center justify-between w-full">
-                                            <div>
-                                                <p class="font-medium text-gray-900">{mod.title}</p>
-                                                <p class="text-sm text-gray-500">{mod.lessons.length} lessons</p>
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <BookOpen class="w-4 h-4 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                    <p class="font-medium text-gray-900">{mod.title}</p>
+                                                    <p class="text-sm text-gray-500">{mod.lessons.length} lessons</p>
+                                                </div>
                                             </div>
                                         </div>
                                     </Accordion.Trigger>
                                     <Accordion.Content class="px-6 pb-4">
-                                        <div class="space-y-2">
-                                            {#each mod.lessons as lesson}
-                                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-                                                    <div class="flex items-center gap-3">
-                                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                            <Video class="w-4 h-4 text-blue-600" />
+                                        <div class="space-y-3">
+                                            <!-- Add Lesson Button -->
+                                            <div class="flex justify-end mb-4">
+                                                <Dialog.Root>
+                                                    <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                        </svg>
+                                                        Add Lesson
+                                                    </Dialog.Trigger>
+
+                                                    <Dialog.Content class="sm:max-w-[500px]">
+                                                        <Dialog.Header>
+                                                            <Dialog.Title class="text-xl font-semibold text-gray-900">Add New Lesson</Dialog.Title>
+                                                            <Dialog.Description class="text-gray-600">
+                                                                Upload a video lesson to this module. Supported formats: MP4, MOV, AVI
+                                                            </Dialog.Description>
+                                                        </Dialog.Header>
+
+                                                        <div class="space-y-6 py-4">
+                                                            <!-- File Upload Area -->
+                                                            <div class="space-y-2">
+                                                                <label for="" class="block text-sm font-medium text-gray-700">Video File</label>
+                                                                <div class="relative">
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="video/*"
+                                                                        class="hidden"
+                                                                        id="video-upload-{mod.id}"
+                                                                        onchange={(e) => {
+                                                                            const target = e.target as HTMLInputElement | null;
+                                                                            selectedFile = target && target.files ? target.files[0] : null;
+                                                                            if (selectedFile) {
+                                                                                const video = document.createElement('video');
+                                                                                video.preload = 'metadata';
+
+                                                                                video.onloadedmetadata = () => {
+                                                                                    window.URL.revokeObjectURL(video.src);
+                                                                                    videoDuration = Math.round(video.duration);
+                                                                                    console.log('Duration (sec):', videoDuration);
+                                                                                };
+
+                                                                                video.src = URL.createObjectURL(selectedFile);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <label
+                                                                        for="video-upload-{mod.id}"
+                                                                        class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+                                                                    >
+                                                                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                                            {#if selectedFile}
+                                                                                <div class="flex items-center gap-3 text-green-600">
+                                                                                    <Video class="w-8 h-8" />
+                                                                                    <div class="text-left">
+                                                                                        <p class="text-sm font-medium">{selectedFile.name}</p>
+                                                                                        <p class="text-xs text-gray-500">
+                                                                                            {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                                                                                            {#if videoDuration > 0}
+                                                                                                • {formatDuration(videoDuration)}
+                                                                                            {/if}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            {:else}
+                                                                                <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                                </svg>
+                                                                                <p class="mb-2 text-sm text-gray-500">
+                                                                                    <span class="font-semibold">Click to upload</span> or drag and drop
+                                                                                </p>
+                                                                                <p class="text-xs text-gray-500">MP4, MOV, AVI (MAX. 500MB)</p>
+                                                                            {/if}
+                                                                        </div>
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Lesson Title -->
+                                                            <div class="space-y-2">
+                                                                <label for="" class="block text-sm font-medium text-gray-700">Lesson Title</label>
+                                                                <Input
+                                                                    bind:value={lessonTitle}
+                                                                    placeholder="Enter lesson title..."
+                                                                    class="w-full"
+                                                                />
+                                                            </div>
+
+                                                            <!-- Lesson Description -->
+                                                            <div class="space-y-2">
+                                                                <label for="" class="block text-sm font-medium text-gray-700">
+                                                                    Description
+                                                                    <span class="text-gray-500 font-normal">(Optional)</span>
+                                                                </label>
+                                                                <Textarea
+                                                                    bind:value={lessonDescription}
+                                                                    placeholder="Describe what students will learn in this lesson..."
+                                                                    rows={3}
+                                                                    class="w-full resize-none"
+                                                                />
+                                                            </div>
+
+                                                            <!-- Video Info Display -->
+                                                            {#if selectedFile && videoDuration > 0}
+                                                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                                    <div class="flex items-center gap-3">
+                                                                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                                                            <Video class="w-5 h-5 text-blue-600" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <p class="text-sm font-medium text-blue-900">Video Ready</p>
+                                                                            <p class="text-xs text-blue-700">
+                                                                                Duration: {formatDuration(videoDuration)} • Size: {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            {/if}
                                                         </div>
-                                                        <span class="text-sm font-medium text-gray-900">{lesson.title}</span>
+
+                                                        <Dialog.Footer class="flex gap-3 pt-6">
+                                                            <Dialog.Close>
+                                                                <Button variant="outline" class="flex-1" id={`lesson-dialog-${mod.id}`}>
+                                                                    Cancel
+                                                                </Button>
+                                                            </Dialog.Close>
+                                                            <Button
+                                                                onclick={() => handleLessonUpload(mod.id)}
+                                                                disabled={!selectedFile || !lessonTitle.trim()}
+                                                                class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                Upload Lesson
+                                                            </Button>
+                                                        </Dialog.Footer>
+                                                    </Dialog.Content>
+                                                </Dialog.Root>
+                                            </div>
+
+                                            <!-- Lessons List -->
+                                            <div class="space-y-2">
+                                                {#each mod.lessons as lesson, lessonIndex}
+                                                    {@const isCurrentVideo = selectedVideoUrl && currentPlayingVideoId === lesson.fileId}
+                                                    {@const isLoadingThis = loadingFileId === lesson.fileId}
+                                                    {@const isPaused = isCurrentVideo && videoPaused}
+                                                    <div
+                                                        role="presentation"
+                                                        class="group flex items-center justify-between p-4 rounded-xl transition-all duration-200 cursor-pointer {isCurrentVideo 
+                                                            ? 'bg-blue-50 border-2 border-blue-200 shadow-sm' 
+                                                            : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'}"
+
+                                                    >
+                                                        <div class="flex items-center gap-4">
+                                                            <!-- Lesson Number & Icon -->
+                                                            <div class="flex items-center gap-3">
+                                                                <div class="w-10 h-10 rounded-full flex items-center justify-center {isCurrentVideo 
+                                                                    ? 'bg-blue-200' 
+                                                                    : 'bg-blue-100'}">
+                                                                    {#if isLoadingThis}
+                                                                        <div class="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                                                    {:else if isCurrentVideo}
+                                                                        <div class="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                                                                            {#if isPaused}
+                                                                                <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                                                    <path d="M8 5v14l11-7z"/>
+                                                                                </svg>
+                                                                            {:else}
+                                                                                <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                                                            {/if}
+                                                                        </div>
+                                                                    {:else}
+                                                                        <Video class="w-5 h-5 text-blue-600" />
+                                                                    {/if}
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Lesson Info -->
+                                                            <Tooltip.Provider>
+                                                                <Tooltip.Root>
+                                                                    <Tooltip.Trigger>
+                                                                        <div class="flex-1 text-left">
+                                                                            <h4 class="font-medium transition-colors line-clamp-1 {isCurrentVideo 
+                                                                                ? 'text-blue-900' 
+                                                                                : 'text-gray-900 group-hover:text-blue-600'}">
+                                                                                {lesson.title}
+                                                                            </h4>
+                                                                            {#if lesson.description}
+                                                                                <p class="text-sm mt-1 line-clamp-1 {isCurrentVideo 
+                                                                                    ? 'text-blue-700' 
+                                                                                    : 'text-gray-500'}">
+                                                                                    {lesson.description}
+                                                                                </p>
+                                                                            {/if}
+                                                                        </div>
+                                                                    </Tooltip.Trigger>
+                                                                    <Tooltip.Content class="max-w-[300px]">
+                                                                        <p><strong>Title:</strong> {lesson.title}</p>
+                                                                        <p><strong>Description:</strong> {lesson.description}</p>
+                                                                    </Tooltip.Content>
+                                                                </Tooltip.Root>
+                                                            </Tooltip.Provider>
+                                                        </div>
+
+                                                        <!-- Duration & Actions -->
+                                                        <div class="flex items-center gap-3">
+                                                            <div class="flex items-center gap-2 text-sm {isCurrentVideo 
+                                                                ? 'text-blue-600' 
+                                                                : 'text-gray-500'}">
+                                                                <Clock class="w-4 h-4" />
+                                                                <span class="font-medium">{formatDuration(lesson.duration ?? 0)}</span>
+                                                            </div>
+                                                            
+                                                            <!-- Play/Pause/Resume Controls -->
+                                                            <div class="flex items-center gap-2">
+                                                                {#if isCurrentVideo}
+                                                                    {#if isPaused}
+                                                                        <!-- Resume Button -->
+                                                                        <button
+                                                                            aria-label="Resume"
+                                                                            onclick={() => handleResumeVideo()}
+                                                                            class="w-8 h-8 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center transition-colors"
+                                                                            title="Resume"
+                                                                        >
+                                                                            <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                                                                <path d="M8 5v14l11-7z"/>
+                                                                            </svg>
+                                                                        </button>
+                                                                    {:else}
+                                                                        <!-- Pause Button -->
+                                                                        <button
+                                                                            aria-label="Pause"
+                                                                            onclick={() => handlePauseVideo()}
+                                                                            class="w-8 h-8 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors"
+                                                                            title="Pause"
+                                                                        >
+                                                                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                                                            </svg>
+                                                                        </button>
+                                                                    {/if}
+                                                                {:else}
+                                                                    <!-- Play Button -->
+                                                                    <button
+                                                                        onclick={() => handleLessonClick(lesson.fileId ?? '')}
+                                                                        class="w-8 h-8 rounded-full flex items-center justify-center transition-all {isLoadingThis 
+                                                                            ? 'bg-gray-200 cursor-not-allowed' 
+                                                                            : 'bg-gray-100 hover:bg-blue-100 group-hover:bg-blue-100'}"
+                                                                        disabled={isLoadingThis}
+                                                                        title="Play"
+                                                                    >
+                                                                        {#if isLoadingThis}
+                                                                            <div class="w-4 h-4 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+                                                                        {:else}
+                                                                            <Play class="w-4 h-4 text-gray-600 group-hover:text-blue-600 ml-0.5" />
+                                                                        {/if}
+                                                                    </button>
+                                                                {/if}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <span class="text-xs text-gray-500 font-medium">{lesson.duration}</span>
-                                                </div>
-                                            {/each}
+                                                {/each}
+
+                                                <!-- Empty State -->
+                                                {#if mod.lessons.length === 0}
+                                                    <div class="text-center py-8">
+                                                        <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                            <Video class="w-6 h-6 text-gray-400" />
+                                                        </div>
+                                                        <p class="text-sm text-gray-500 mb-2">No lessons yet</p>
+                                                        <p class="text-xs text-gray-400">Add your first lesson to get started</p>
+                                                    </div>
+                                                {/if}
+                                            </div>
                                         </div>
                                     </Accordion.Content>
                                 </Accordion.Item>
                             {/each}
-
-                            <Accordion.Item value="materials" class="border-b-0">
-                                <Accordion.Trigger class="px-6 py-4 hover:bg-gray-50 text-left w-full">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                                            <FileText class="w-4 h-4 text-orange-600" />
-                                        </div>
-                                        <div>
-                                            <p class="font-medium text-gray-900">Course Materials</p>
-                                            <p class="text-sm text-gray-500">{materials.length} files</p>
-                                        </div>
-                                    </div>
-                                </Accordion.Trigger>
-                                <Accordion.Content class="px-6 pb-4">
-                                    <div class="space-y-2">
-                                        {#each materials as material}
-                                            <a
-                                                href={material.link}
-                                                class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
-                                            >
-                                                <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                                                    <material.icon class="w-4 h-4 text-gray-600" />
-                                                </div>
-                                                <span class="text-sm font-medium text-gray-900 group-hover:text-blue-600">
-                                                    {material.name}
-                                                </span>
-                                                <Download class="w-4 h-4 text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </a>
-                                        {/each}
-                                    </div>
-                                </Accordion.Content>
-                            </Accordion.Item>
                         </Accordion.Root>
                     </div>
                 </div>

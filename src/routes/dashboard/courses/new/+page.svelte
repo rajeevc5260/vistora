@@ -11,8 +11,19 @@
     let thumbnailUrl = $state("");
     let isSubmitting = $state(false);
 
+    let fileInputRef: HTMLInputElement | null = null;
+
+    let fileName = $state("");
+    let thumbnailBase64 = $state("");
+    let thumbnailError = $state("");
+
+    // $inspect("thumbnailBase64", thumbnailBase64)
+
     let showPreview = $derived(
-        thumbnailUrl.startsWith("http://") || thumbnailUrl.startsWith("https://"),
+        thumbnailBase64 || (
+            thumbnailUrl.startsWith("http://") ||
+            thumbnailUrl.startsWith("https://")
+        )
     );
 
     async function handleSubmit() {
@@ -36,7 +47,7 @@
                 body: JSON.stringify({
                     title,
                     description,
-                    thumbnailUrl,
+                    thumbnailBase64: thumbnailBase64,
                 }),
                 headers: {
                     "Content-Type": "application/json",
@@ -62,6 +73,64 @@
     }
 
     const fallbackImage = "https://placehold.co/640x360?text=Thumbnail+Preview";
+
+    function openFilePicker() {
+        if (fileInputRef) {
+            fileInputRef.click();
+        }
+    }
+    
+
+    function handleFileSelected(event: Event) {
+        const file = (event.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        fileName = file.name;
+        thumbnailUrl = ""; // Clear URL input if file is uploaded
+        thumbnailError = "";
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            thumbnailBase64 = reader.result as string;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function validateAndConvertImageUrl(url: string) {
+        thumbnailError = "";
+        thumbnailBase64 = "";
+
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            thumbnailError = "Please enter a valid image URL";
+            return;
+        }
+
+        try {
+            const res = await fetch(url);
+            const contentType = res.headers.get("content-type") || "";
+            if (!contentType.startsWith("image/")) {
+                thumbnailError = "The URL does not point to a valid image.";
+                return;
+            }
+
+            const blob = await res.blob();
+            const reader = new FileReader();
+            reader.onload = () => {
+                thumbnailBase64 = reader.result as string;
+            };
+            reader.readAsDataURL(blob);
+        } catch (err) {
+            thumbnailError = "Failed to load image. Please check the URL.";
+        }
+    }
+
+    $effect(() => {
+        if (thumbnailUrl.trim()) {
+            fileName = "";
+            thumbnailBase64 = "";
+            validateAndConvertImageUrl(thumbnailUrl.trim());
+        }
+    });
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -150,17 +219,29 @@
                         <div class="flex gap-2">
                             <Input
                                 bind:value={thumbnailUrl}
-                                placeholder="https://example.com/your-course-image.jpg"
-                                class="text-base"
-                            />
-                            <Button variant="outline" size="sm" class="gap-2 flex-shrink-0">
+                                placeholder="https://example.com/your-course-image.jpg"/>
+                            <Button variant="outline" size="sm" class="gap-2 flex-shrink-0" onclick={openFilePicker} type="button">
                                 <ImageIcon class="w-4 h-4" />
                                 Browse
                             </Button>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                class="hidden"
+                                bind:this={fileInputRef}
+                                onchange={handleFileSelected}
+                            />
                         </div>
-                        <p class="text-xs text-gray-500">
-                            Recommended: 1280×720px • Use a high-quality image that represents your course
-                        </p>
+                        {#if fileName}
+                            <p class="text-xs text-gray-500 mt-1">Selected file: {fileName}</p>
+                        {/if}
+                        {#if thumbnailError}
+                            <p class="text-xs text-red-500 mt-1">{thumbnailError}</p>
+                        {:else}
+                            <p class="text-xs text-gray-500 mt-1">
+                                Recommended: 1280×720px • Use a high-quality image that represents your course
+                            </p>
+                        {/if}
                     </div>
                 </div>
 
@@ -202,7 +283,7 @@
                             <!-- Thumbnail -->
                             <div class="aspect-video bg-gray-100 relative overflow-hidden">
                                 <img
-                                    src={showPreview ? thumbnailUrl : fallbackImage}
+                                    src={showPreview ? (thumbnailBase64 || thumbnailUrl) : fallbackImage}
                                     alt="Course Thumbnail Preview"
                                     class="w-full h-full object-cover"
                                 />
