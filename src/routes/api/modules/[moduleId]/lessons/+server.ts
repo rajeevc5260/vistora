@@ -6,7 +6,6 @@ import { trelae } from '$lib/utils/trelae';
 import { randomUUID } from 'crypto';
 
 export async function POST({ request, params }) {
-	console.log("testing started")
 	const moduleId = params.moduleId;
 	const form = await request.formData();
 
