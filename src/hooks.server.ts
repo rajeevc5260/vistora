@@ -21,7 +21,8 @@ export const handle = SvelteKitAuth({
       if (!email || !googleId) return false;
 
       const existing = await db.query.users.findFirst({
-        where: (u, { or, eq }) => or(eq(u.googleId, googleId), eq(u.email, email)),
+        where: (u, { or, eq }) =>
+          or(eq(u.googleId, googleId), eq(u.email, email)),
       });
 
       if (!existing) {
@@ -31,16 +32,26 @@ export const handle = SvelteKitAuth({
           googleId,
           name: user.name ?? null,
           avatarUrl: user.image ?? null,
-          namespaceId: `ns-${randomUUID()}`,
           role: "viewer",
         });
       }
 
       return true;
     },
-    // post-login redirect
+    async session({ session }) {
+      const dbUser = await db.query.users.findFirst({
+        where: (u, { eq }) => eq(u.email, session.user?.email ?? ""),
+      });
+
+      if (dbUser && session.user) {
+        session.user.id = dbUser.id;
+      }
+
+      return session;
+    },
+    
     async redirect({ baseUrl }) {
       return `${baseUrl}/dashboard`;
-    }
-  }
+    },
+  },
 }).handle;

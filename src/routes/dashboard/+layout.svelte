@@ -18,7 +18,14 @@
 <Sidebar.Provider>
     <Sidebar.Root>
         <Sidebar.Header>
-            <h1 class="text-xl font-bold tracking-tight">Vistora</h1>
+            <div class="flex items-center gap-3 ml-2">
+                <div class="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg flex items-center justify-center shadow-lg">
+                    <span class="text-white font-bold text-sm">V</span>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                    Vistora
+                </h1>
+            </div>
         </Sidebar.Header>
         <Sidebar.Content class="flex flex-col justify-between h-full">
             <div class="space-y-4">

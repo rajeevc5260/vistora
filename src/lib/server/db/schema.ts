@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { uuid, boolean, pgTable, text, timestamp, integer, primaryKey } from "drizzle-orm/pg-core";
+import { uuid, boolean, pgTable, text, timestamp, integer, primaryKey, uniqueIndex } from "drizzle-orm/pg-core";
 
 // Users
 export const users = pgTable("users", {
@@ -8,7 +8,6 @@ export const users = pgTable("users", {
   googleId: text("google_id").notNull().unique(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
-  namespaceId: text("namespace_id").notNull(),
   role: text("role").default("viewer"), // 'admin', 'instructor', 'viewer'
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -20,9 +19,13 @@ export const courses = pgTable("courses", {
   description: text("description"),
   thumbnailUrl: text("thumbnail_url"),
   instructorId: uuid("instructor_id").references(() => users.id),
-  namespaceId: text("namespace_id"),
+  namespaceId: text("namespace_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+},
+  (table) => [
+    uniqueIndex("unique_course_namespace").on(table.id, table.namespaceId),
+  ]
+);
 
 // Modules
 export const modules = pgTable("modules", {
@@ -44,15 +47,6 @@ export const videos = pgTable("videos", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Video Progress
-export const videoProgress = pgTable("video_progress", {
-  userId: uuid("user_id").references(() => users.id),
-  videoId: uuid("video_id").references(() => videos.id),
-  watchedUntil: integer("watched_until"), // in seconds
-  completed: boolean("completed").default(false),
-}, (table) => ({
-  pk: primaryKey({ columns: [table.userId, table.videoId] }), // Composite PK
-}));
 
 // Type exports
 export type User = typeof users.$inferSelect;
@@ -63,6 +57,4 @@ export type Module = typeof modules.$inferSelect;
 export type NewModule = typeof modules.$inferInsert;
 export type Video = typeof videos.$inferSelect;
 export type NewVideo = typeof videos.$inferInsert;
-export type VideoProgress = typeof videoProgress.$inferSelect;
-export type NewVideoProgress = typeof videoProgress.$inferInsert;
 
