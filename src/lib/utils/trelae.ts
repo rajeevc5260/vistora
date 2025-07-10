@@ -11,5 +11,3 @@ export const trelae = new Trelae({
     apiKey: trelaeAPIKey,
     devMode: false
 });
-
-console.log('Initialized Trelae instance:', trelae);

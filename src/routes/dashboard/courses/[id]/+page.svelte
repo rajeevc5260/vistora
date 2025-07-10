@@ -20,12 +20,22 @@
         Eye,
         Calendar,
         Settings,
-        Shapes
+        Shapes,
+        Trash,
+
+        X,
+
+        Pencil,
+
+        Plus
+
+
+
     } from "lucide-svelte";
     import { formatDuration, formatTotalDuration } from "$lib/utils/formatTime";
     import { loadVideoFromFirstLesson } from "$lib/utils/loadFirstVideo";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-
+    import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
 
     let { data }: PageProps = $props();
     let { course, modules } = data;
@@ -292,6 +302,57 @@
     function handleVideoCanPlay() {
         videoPaused = false;
     }
+
+    let isDeleting = $state(false);
+
+    async function handleDeleteCourse() {
+        isDeleting = true;
+        try {
+            const res = await fetch(`/api/courses/${course.id}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" }
+            });
+
+            if (res.ok) {
+                toast.success("Course deleted successfully");
+                goto("/dashboard/courses");
+            } else {
+                const err = await res.json();
+                toast.error(err.message || "Failed to delete course");
+            }
+        } catch (error) {
+            toast.error("Unexpected error while deleting");
+            console.error("Delete error:", error);
+        } finally {
+            isDeleting = false;
+        }
+    }
+
+    let editModules: Record<string, boolean> = $state({});
+    let selectedFileIds: Record<string, Set<string>> = $state({});
+
+    async function handleBulkDelete(moduleId: string) {
+        const idsToDelete = Array.from(selectedFileIds[moduleId] ?? []);
+        if (idsToDelete.length === 0) return;
+
+        try {
+            const toastId = toast.loading('Deleting selected lessons...', { duration: Infinity });
+
+            await fetch(`/api/modules/${moduleId}/lessons/bulk-delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileIds: idsToDelete }),
+            });
+
+            toast.success('Lessons deleted', { id: toastId });
+            selectedFileIds[moduleId] = new Set();
+            await goto(location.pathname, { invalidateAll: true });
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to delete selected lessons');
+        }
+    }
+
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -311,10 +372,6 @@
                 </div>
                 
                 <div class="flex items-center gap-3">
-                    <Button variant="outline" size="sm" class="gap-2">
-                        <Eye class="w-4 h-4" />
-                        Preview
-                    </Button>
                     <!-- Module Creation Form -->
                     <Dialog.Root>
                         <Dialog.Trigger class={buttonVariants({ variant: "outline", size: "sm" })}
@@ -340,6 +397,36 @@
                         </Dialog.Content>
                     </Dialog.Root>
                     <Dialog.Root>
+                        <AlertDialog.Root>
+                            <AlertDialog.Trigger>
+                                <Button variant="destructive" size="sm" class="gap-2">
+                                    <Trash class="w-4 h-4" />
+                                    Delete Course
+                                </Button>
+                            </AlertDialog.Trigger>
+                            
+                            <AlertDialog.Content>
+                                <AlertDialog.Header>
+                                <AlertDialog.Title>Delete Course</AlertDialog.Title>
+                                <AlertDialog.Description>
+                                    This action will permanently delete this course, its modules, lessons, and the associated Data.
+                                    <br />
+                                    Are you sure you want to proceed?
+                                </AlertDialog.Description>
+                                </AlertDialog.Header>
+                            
+                                <AlertDialog.Footer>
+                                <AlertDialog.Cancel >Cancel</AlertDialog.Cancel>
+                                <AlertDialog.Action class={buttonVariants({ variant: "destructive"})}  onclick={handleDeleteCourse} disabled={isDeleting}>
+                                    {#if isDeleting}
+                                        <span class="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                    {/if}
+                                    Confirm Delete
+                                </AlertDialog.Action>
+                                </AlertDialog.Footer>
+                            </AlertDialog.Content>
+                        </AlertDialog.Root>
+
                         <Dialog.Trigger class={buttonVariants({ variant: "default", size: "sm" })}>
                             <Pen class="w-4 h-4" />
                             Edit Course
@@ -395,8 +482,8 @@
     <!-- Main Content -->
     <div class="max-w-7xl mx-auto px-4 lg:px-0 py-8">
         <div class="flex flex-col lg:flex-row gap-8">
-            <!-- Left Section -->
-            <div class="lg:w-2/3 space-y-8">
+            <!-- Left Section - Will shrink as screen size reduces -->
+            <div class="lg:flex-1 lg:min-w-0 space-y-8">
                 <!-- Video/Thumbnail Section -->
                 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
                     <div class="aspect-video bg-gray-900 relative group">
@@ -442,7 +529,6 @@
                             </div>
                         {/if}
                     </div>
-
 
                     <!-- Course Stats -->
                     <div class="p-6 border-b">
@@ -499,8 +585,8 @@
                 </div>
             </div>
 
-            <!-- Right Sidebar -->
-            <div class="lg:w-1/3">
+            <!-- Right Sidebar - Fixed minimum width -->
+            <div class="lg:w-1/3 lg:min-w-[380px] lg:max-w-[420px]">
                 <div class="bg-white rounded-2xl shadow-sm sticky top-24">
                     <div class="p-6 border-b">
                         <h2 class="text-xl font-semibold text-gray-900 mb-2">Course Content</h2>
@@ -527,12 +613,31 @@
                                     <Accordion.Content class="px-6 pb-4">
                                         <div class="space-y-3">
                                             <!-- Add Lesson Button -->
-                                            <div class="flex justify-end mb-4">
+                                            <div class="flex gap-2 justify-end mb-4">
+                                                {#if mod.lessons.length > 0}
+                                                    <Button
+                                                        variant="secondary"
+                                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors {editModules[mod.id] 
+                                                            ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
+                                                            : ''}"
+                                                        onclick={() => {
+                                                            editModules[mod.id] = !editModules[mod.id];
+                                                            if (!editModules[mod.id]) selectedFileIds[mod.id] = new Set();
+                                                        }}
+                                                    >
+                                                        {#if editModules[mod.id]}
+                                                            <X class="w-4 h-4"/>
+                                                            Cancel
+                                                        {:else}
+                                                            <Pencil class="w-4 h-4"/>
+                                                            Edit
+                                                        {/if}
+                                                    </Button>
+                                                {/if}
+
                                                 <Dialog.Root>
-                                                    <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                                        </svg>
+                                                    <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 hover:border-blue-300">
+                                                        <Plus class="w-4 h-4"/>
                                                         Add Lesson
                                                     </Dialog.Trigger>
 
@@ -663,124 +768,203 @@
                                                 </Dialog.Root>
                                             </div>
 
+                                            {#if editModules[mod.id] && mod.lessons.length > 0}
+                                                <div class=" mb-4">
+                                                    <div class="flex flex-col gap-3 items-start">
+                                                        <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                                onchange={(e) => {
+                                                                    const checked = e.currentTarget.checked;
+                                                                    selectedFileIds[mod.id] = new Set(
+                                                                        checked ? mod.lessons.map(l => l.fileId).filter((id) => id !== null) : []
+                                                                    );
+                                                                }}
+                                                                checked={
+                                                                    selectedFileIds[mod.id]?.size === mod.lessons.length &&
+                                                                    mod.lessons.length > 0
+                                                                }
+                                                            />
+                                                            <span class="select-none">Select all lessons</span>
+                                                        </label>
+
+                                                        {#if selectedFileIds[mod.id]?.size > 0}
+                                                            <AlertDialog.Root>
+                                                                <AlertDialog.Trigger>
+                                                                    <Button
+                                                                        variant="destructive"
+                                                                        size="sm"
+                                                                        class="ml-[25px] px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 hover:border-red-300 rounded-lg transition-colors"
+                                                                    >
+                                                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                        Delete selected ({selectedFileIds[mod.id].size})
+                                                                    </Button>
+                                                                </AlertDialog.Trigger>
+
+                                                                <AlertDialog.Content>
+                                                                    <AlertDialog.Header>
+                                                                        <AlertDialog.Title>Confirm Delete</AlertDialog.Title>
+                                                                        <AlertDialog.Description>
+                                                                            Are you sure you want to delete the {selectedFileIds[mod.id].size} selected lesson{selectedFileIds[mod.id].size > 1 ? 's' : ''}?
+                                                                            This action cannot be undone.
+                                                                        </AlertDialog.Description>
+                                                                    </AlertDialog.Header>
+
+                                                                    <AlertDialog.Footer>
+                                                                        <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                                                                        <AlertDialog.Action class={buttonVariants({ variant: "destructive"})}  onclick={() => handleBulkDelete(mod.id)}>
+                                                                            Confirm Delete
+                                                                        </AlertDialog.Action>
+                                                                    </AlertDialog.Footer>
+                                                                </AlertDialog.Content>
+                                                            </AlertDialog.Root>
+                                                        {/if}
+                                                    </div>
+                                                </div>
+                                            {/if}
+
                                             <!-- Lessons List -->
                                             <div class="space-y-2">
                                                 {#each mod.lessons as lesson, lessonIndex}
                                                     {@const isCurrentVideo = selectedVideoUrl && currentPlayingVideoId === lesson.fileId}
                                                     {@const isLoadingThis = loadingFileId === lesson.fileId}
                                                     {@const isPaused = isCurrentVideo && videoPaused}
-                                                    <div
-                                                        role="presentation"
-                                                        class="group flex items-center justify-between p-4 rounded-xl transition-all duration-200 cursor-pointer {isCurrentVideo 
-                                                            ? 'bg-blue-50 border-2 border-blue-200 shadow-sm' 
-                                                            : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'}"
+                                                    <div class="flex items-center">
+                                                        {#if editModules[mod.id]}
+                                                            <div class="mr-3 flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                                    checked={lesson.fileId !== null && selectedFileIds[mod.id]?.has(lesson.fileId)}
+                                                                    onchange={(e) => {
+                                                                        const checked = e.currentTarget.checked;
+                                                                        const prevSet = selectedFileIds[mod.id] ?? new Set();
+                                                                        const nextSet = new Set(prevSet); // create new Set to trigger reactivity
+                                                                        if (lesson.fileId !== null) {
+                                                                            checked ? nextSet.add(lesson.fileId) : nextSet.delete(lesson.fileId);
+                                                                            selectedFileIds[mod.id] = nextSet;
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        {/if}
 
-                                                    >
-                                                        <div class="flex items-center gap-4">
-                                                            <!-- Lesson Number & Icon -->
+                                                        <div
+                                                            role="presentation"
+                                                            class="group flex items-center justify-between p-4 rounded-xl transition-all duration-200 cursor-pointer w-full {isCurrentVideo 
+                                                                ? 'bg-blue-50 border-2 border-blue-200 shadow-sm' 
+                                                                : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'}"
+
+                                                        >
+                                                            <div class="flex items-center gap-4">
+                                                                <!-- Lesson Number & Icon -->
+                                                                <div class="flex items-center gap-3">
+                                                                    <div class="w-10 h-10 rounded-full flex items-center justify-center {isCurrentVideo 
+                                                                        ? 'bg-blue-200' 
+                                                                        : 'bg-blue-100'}">
+                                                                        {#if isLoadingThis}
+                                                                            <div class="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                                                        {:else if isCurrentVideo}
+                                                                            <div class="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                                                                                {#if isPaused}
+                                                                                    <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                                                        <path d="M8 5v14l11-7z"/>
+                                                                                    </svg>
+                                                                                {:else}
+                                                                                    <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                                                                {/if}
+                                                                            </div>
+                                                                        {:else}
+                                                                            <Video class="w-5 h-5 text-blue-600" />
+                                                                        {/if}
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Lesson Info -->
+                                                                <Tooltip.Provider>
+                                                                    <Tooltip.Root>
+                                                                        <Tooltip.Trigger>
+                                                                            <div class="flex-1 text-left">
+                                                                                <h4 class="font-medium transition-colors line-clamp-1 {isCurrentVideo 
+                                                                                    ? 'text-blue-900' 
+                                                                                    : 'text-gray-900 group-hover:text-blue-600'}">
+                                                                                    {lesson.title}
+                                                                                </h4>
+                                                                                {#if lesson.description}
+                                                                                    <p class="text-sm mt-1 line-clamp-1 {isCurrentVideo 
+                                                                                        ? 'text-blue-700' 
+                                                                                        : 'text-gray-500'}">
+                                                                                        {lesson.description}
+                                                                                    </p>
+                                                                                {/if}
+                                                                            </div>
+                                                                        </Tooltip.Trigger>
+                                                                        <Tooltip.Content class="max-w-[300px]">
+                                                                            <p><strong>Title:</strong> {lesson.title}</p>
+                                                                            <p><strong>Description:</strong> {lesson.description}</p>
+                                                                        </Tooltip.Content>
+                                                                    </Tooltip.Root>
+                                                                </Tooltip.Provider>
+                                                            </div>
+
+                                                            <!-- Duration & Actions -->
                                                             <div class="flex items-center gap-3">
-                                                                <div class="w-10 h-10 rounded-full flex items-center justify-center {isCurrentVideo 
-                                                                    ? 'bg-blue-200' 
-                                                                    : 'bg-blue-100'}">
-                                                                    {#if isLoadingThis}
-                                                                        <div class="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                                                                    {:else if isCurrentVideo}
-                                                                        <div class="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                                                                            {#if isPaused}
-                                                                                <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                                <div class="flex items-center gap-2 text-sm {isCurrentVideo 
+                                                                    ? 'text-blue-600' 
+                                                                    : 'text-gray-500'}">
+                                                                    <Clock class="w-4 h-4" />
+                                                                    <span class="font-medium">{formatDuration(lesson.duration ?? 0)}</span>
+                                                                </div>
+                                                                
+                                                                <!-- Play/Pause/Resume Controls -->
+                                                                <div class="flex items-center gap-2">
+                                                                    {#if isCurrentVideo}
+                                                                        {#if isPaused}
+                                                                            <!-- Resume Button -->
+                                                                            <button
+                                                                                aria-label="Resume"
+                                                                                onclick={() => handleResumeVideo()}
+                                                                                class="w-8 h-8 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center transition-colors"
+                                                                                title="Resume"
+                                                                            >
+                                                                                <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
                                                                                     <path d="M8 5v14l11-7z"/>
                                                                                 </svg>
-                                                                            {:else}
-                                                                                <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                                                                            {/if}
-                                                                        </div>
+                                                                            </button>
+                                                                        {:else}
+                                                                            <!-- Pause Button -->
+                                                                            <button
+                                                                                aria-label="Pause"
+                                                                                onclick={() => handlePauseVideo()}
+                                                                                class="w-8 h-8 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors"
+                                                                                title="Pause"
+                                                                            >
+                                                                                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                                                                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                                                                </svg>
+                                                                            </button>
+                                                                        {/if}
                                                                     {:else}
-                                                                        <Video class="w-5 h-5 text-blue-600" />
+                                                                        <!-- Play Button -->
+                                                                        <button
+                                                                            onclick={() => handleLessonClick(lesson.fileId ?? '')}
+                                                                            class="w-8 h-8 rounded-full flex items-center justify-center transition-all {isLoadingThis 
+                                                                                ? 'bg-gray-200 cursor-not-allowed' 
+                                                                                : 'bg-gray-100 hover:bg-blue-100 group-hover:bg-blue-100'}"
+                                                                            disabled={isLoadingThis}
+                                                                            title="Play"
+                                                                        >
+                                                                            {#if isLoadingThis}
+                                                                                <div class="w-4 h-4 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+                                                                            {:else}
+                                                                                <Play class="w-4 h-4 text-gray-600 group-hover:text-blue-600 ml-0.5" />
+                                                                            {/if}
+                                                                        </button>
                                                                     {/if}
                                                                 </div>
-                                                            </div>
-
-                                                            <!-- Lesson Info -->
-                                                            <Tooltip.Provider>
-                                                                <Tooltip.Root>
-                                                                    <Tooltip.Trigger>
-                                                                        <div class="flex-1 text-left">
-                                                                            <h4 class="font-medium transition-colors line-clamp-1 {isCurrentVideo 
-                                                                                ? 'text-blue-900' 
-                                                                                : 'text-gray-900 group-hover:text-blue-600'}">
-                                                                                {lesson.title}
-                                                                            </h4>
-                                                                            {#if lesson.description}
-                                                                                <p class="text-sm mt-1 line-clamp-1 {isCurrentVideo 
-                                                                                    ? 'text-blue-700' 
-                                                                                    : 'text-gray-500'}">
-                                                                                    {lesson.description}
-                                                                                </p>
-                                                                            {/if}
-                                                                        </div>
-                                                                    </Tooltip.Trigger>
-                                                                    <Tooltip.Content class="max-w-[300px]">
-                                                                        <p><strong>Title:</strong> {lesson.title}</p>
-                                                                        <p><strong>Description:</strong> {lesson.description}</p>
-                                                                    </Tooltip.Content>
-                                                                </Tooltip.Root>
-                                                            </Tooltip.Provider>
-                                                        </div>
-
-                                                        <!-- Duration & Actions -->
-                                                        <div class="flex items-center gap-3">
-                                                            <div class="flex items-center gap-2 text-sm {isCurrentVideo 
-                                                                ? 'text-blue-600' 
-                                                                : 'text-gray-500'}">
-                                                                <Clock class="w-4 h-4" />
-                                                                <span class="font-medium">{formatDuration(lesson.duration ?? 0)}</span>
-                                                            </div>
-                                                            
-                                                            <!-- Play/Pause/Resume Controls -->
-                                                            <div class="flex items-center gap-2">
-                                                                {#if isCurrentVideo}
-                                                                    {#if isPaused}
-                                                                        <!-- Resume Button -->
-                                                                        <button
-                                                                            aria-label="Resume"
-                                                                            onclick={() => handleResumeVideo()}
-                                                                            class="w-8 h-8 bg-green-600 hover:bg-green-700 rounded-full flex items-center justify-center transition-colors"
-                                                                            title="Resume"
-                                                                        >
-                                                                            <svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                                                                                <path d="M8 5v14l11-7z"/>
-                                                                            </svg>
-                                                                        </button>
-                                                                    {:else}
-                                                                        <!-- Pause Button -->
-                                                                        <button
-                                                                            aria-label="Pause"
-                                                                            onclick={() => handlePauseVideo()}
-                                                                            class="w-8 h-8 bg-blue-600 hover:bg-blue-700 rounded-full flex items-center justify-center transition-colors"
-                                                                            title="Pause"
-                                                                        >
-                                                                            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                                                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-                                                                            </svg>
-                                                                        </button>
-                                                                    {/if}
-                                                                {:else}
-                                                                    <!-- Play Button -->
-                                                                    <button
-                                                                        onclick={() => handleLessonClick(lesson.fileId ?? '')}
-                                                                        class="w-8 h-8 rounded-full flex items-center justify-center transition-all {isLoadingThis 
-                                                                            ? 'bg-gray-200 cursor-not-allowed' 
-                                                                            : 'bg-gray-100 hover:bg-blue-100 group-hover:bg-blue-100'}"
-                                                                        disabled={isLoadingThis}
-                                                                        title="Play"
-                                                                    >
-                                                                        {#if isLoadingThis}
-                                                                            <div class="w-4 h-4 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
-                                                                        {:else}
-                                                                            <Play class="w-4 h-4 text-gray-600 group-hover:text-blue-600 ml-0.5" />
-                                                                        {/if}
-                                                                    </button>
-                                                                {/if}
                                                             </div>
                                                         </div>
                                                     </div>
