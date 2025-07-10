@@ -7,13 +7,17 @@ import { randomUUID } from 'crypto';
 
 export async function POST({ request, params }) {
 	const moduleId = params.moduleId;
-	const form = await request.formData();
+	let body;
+	try {
+		body = await request.json();
+	} catch {
+		return json({ error: 'Invalid JSON' }, { status: 400 });
+	}
 
-	const title = form.get('title')?.toString();
-	const file = form.get('file') as File | null;
+	const { title, fileName, fileSize } = body;
 
-	if (!title || !file) {
-		return json({ error: 'Missing title or file' }, { status: 400 });
+	if (!title || !fileName || !fileSize) {
+		return json({ error: 'Missing title or file metadata' }, { status: 400 });
 	}
 
 	// Get module and course
@@ -32,9 +36,9 @@ export async function POST({ request, params }) {
 	// Start multipart upload
 	const namespace = trelae.namespace(courseRow.namespaceId);
 	const { id: fileId, uploadId, partSize, partCount, urls } = await namespace.startMultipartUpload({
-		name: file.name,
+		name: fileName,
 		location: `${moduleRow.title}`,
-		size: file.size
+		size: fileSize,
 	});
 
 	// Return upload instructions to client
@@ -44,7 +48,7 @@ export async function POST({ request, params }) {
 		partSize,
 		partCount,
 		partUrls: urls,
-		fileName: file.name,
+		fileName,
 		title
 	});
 }

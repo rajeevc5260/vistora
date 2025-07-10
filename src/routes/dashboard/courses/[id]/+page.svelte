@@ -123,13 +123,15 @@
         if (dialogElement) dialogElement.click();
 
         try {
-            const formData = new FormData();
-            formData.append("title", lessonTitle);
-            formData.append("file", selectedFile);
-
             const res = await fetch(`/api/modules/${moduleId}/lessons`, {
                 method: "POST",
-                body: formData,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: lessonTitle,
+                    fileName: selectedFile.name,
+                    fileType: selectedFile.type,
+                    fileSize: selectedFile.size,
+                }),
             });
 
             if (!res.ok) throw new Error("Failed to initiate upload");
