@@ -3,7 +3,8 @@
     import { Button } from "$lib/components/ui/button";
     import { goto } from "$app/navigation";
     import { Badge } from "$lib/components/ui/badge";
-    import { CalendarDays, Plus, BookOpen, Clock, Eye } from "lucide-svelte";
+    import { CalendarDays, Plus, BookOpen, Check, Eye } from "lucide-svelte";
+    import Input from "$lib/components/ui/input/input.svelte";
 
     type Course = {
         id: string;
@@ -18,10 +19,10 @@
     let loading = $state(false);
     let endReached = $state(false);
 
-    const limit = 9;
+    const limit = 20;
 
     async function loadMoreCourses() {
-        if (loading || endReached) return;
+        if (loading || endReached || isSearching) return;
 
         loading = true;
         const res = await fetch(`/api/courses?offset=${offset}&limit=${limit}`);
@@ -58,6 +59,65 @@
             year: "numeric",
         });
     }
+
+    let searchQuery = $state('');
+    let searchTimeout: NodeJS.Timeout | null = null;
+    let searchOffset = $state(0);
+    let searchLimit = 20;
+    let searchEndReached = $state(false);
+    let isSearching = $state(false);
+
+    async function searchCourses(query: string, append = false) {
+        if (loading || searchEndReached) return;
+
+        loading = true;
+
+        const res = await fetch(`/api/courses/search?query=${encodeURIComponent(query)}&limit=${searchLimit}&offset=${searchOffset}`);
+        const result = await res.json();
+
+        if (append) {
+            courses = [...courses, ...result];
+        } else {
+            courses = result;
+        }
+
+        if (result.length < searchLimit) {
+            searchEndReached = true;
+        }
+
+        searchOffset += searchLimit;
+        loading = false;
+        isSearching = false;
+    }
+
+
+
+    function handleSearchInput(event: Event) {
+        const value = (event.target as HTMLInputElement).value;
+        searchQuery = value;
+
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        if (value.trim() === '') {
+            // Reset to default scroll mode
+            isSearching = false;
+            courses = [];
+            offset = 0;
+            endReached = false;
+            loadMoreCourses();
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            searchOffset = 0;
+            searchEndReached = false;
+            courses = [];
+            isSearching = true;
+            searchCourses(value.trim());
+        }, 300);
+    }
+
+
 </script>
 
 <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
@@ -82,6 +142,18 @@
         </Button>
     </div>
 
+    <div class="relative">
+        <Input
+            type="text"
+            placeholder="Search your courses..."
+            class="w-full md:w-1/3 md:min-w-sm px-4 py-2"
+            oninput={handleSearchInput}
+            value={searchQuery}
+        />
+        {#if isSearching}
+            <div class="absolute right-3 top-2.5 w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
+        {/if}
+    </div>
     <!-- Courses Grid -->
     {#if courses.length === 0 && !loading}
         <!-- Empty State -->
@@ -147,9 +219,9 @@
                                 <span>{formatDate(course.createdAt)}</span>
                             </div>
                             
-                            <Badge variant="secondary" class="text-xs px-3 py-1">
-                                <Clock class="w-3 h-3 mr-1" />
-                                Draft
+                            <Badge variant="secondary" class="text-xs px-3 py-1 bg-green-200 border-2 border-white ">
+                                <Check  class="w-3 h-3 mr-1" />
+                                Published
                             </Badge>
                         </div>
                     </div>
@@ -158,6 +230,13 @@
         </div>
     {/if}
 
+    {#if isSearching && !searchEndReached && !loading}
+        <div class="text-center py-6">
+            <Button onclick={() => searchCourses(searchQuery, true)}>
+                Load More Results
+            </Button>
+        </div>
+    {/if}
     <!-- Loading States -->
     {#if loading}
         <div class="text-center py-8">

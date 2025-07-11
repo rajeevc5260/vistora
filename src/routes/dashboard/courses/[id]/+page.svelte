@@ -22,20 +22,19 @@
         Settings,
         Shapes,
         Trash,
-
         X,
-
         Pencil,
+        Plus,
 
-        Plus
-
-
+        GalleryThumbnails
 
     } from "lucide-svelte";
     import { formatDuration, formatTotalDuration } from "$lib/utils/formatTime";
     import { loadVideoFromFirstLesson } from "$lib/utils/loadFirstVideo";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
+    import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+
 
     let { data }: PageProps = $props();
     let { course, modules } = data;
@@ -353,6 +352,26 @@
         }
     }
 
+
+    async function handleDeleteModule(moduleId: string) {
+        if (!moduleId) return;
+
+        try {
+            const toastId = toast.loading("Deleting module...", { duration: Infinity });
+            const res = await fetch(`/api/modules/${moduleId}`, { 
+                method: "DELETE" 
+            });
+
+            if (!res.ok) throw new Error("Failed");
+
+            toast.success("Module deleted", { id: toastId });
+            await goto(location.pathname, { invalidateAll: true });
+        } catch (err) {
+            console.error("Module delete error:", err);
+            toast.error("Failed to delete module");
+        }
+    }
+
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -372,17 +391,62 @@
                 </div>
                 
                 <div class="flex items-center gap-3">
-                    <!-- Module Creation Form -->
+                   <!-- Course Management Dropdown -->
+                    <DropdownMenu.Root>
+                        <DropdownMenu.Trigger>
+                            <Button variant="outline" size="sm" class="gap-2">
+                                <Settings class="w-4 h-4" />
+                                Manage Course
+                            </Button>
+                        </DropdownMenu.Trigger>
+
+                        <DropdownMenu.Content align="end" class="w-[220px]">
+                            <DropdownMenu.Group>
+                                <DropdownMenu.Label>Course Options</DropdownMenu.Label>
+                                <DropdownMenu.Separator />
+                                <DropdownMenu.Item onclick={() => goto(`/dashboard/courses/${course.id}/thumbnails`)}>
+                                    <GalleryThumbnails class="w-4 h-4"/>
+                                    Thumbnails
+                                </DropdownMenu.Item>
+
+                                <DropdownMenu.Item
+                                    onclick={() => {
+                                        document.getElementById('add-module-trigger')?.click();
+                                    }}
+                                >
+                                    <Shapes class="w-4 h-4" />
+                                    Add Module
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Item
+                                    onclick={() => {
+                                        document.getElementById('edit-course-trigger')?.click();
+                                    }}
+                                >
+                                    <Pen class="w-4 h-4" />
+                                    Edit Course
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Item
+                                    onclick={() => {
+                                        document.getElementById('delete-course-trigger')?.click();
+                                    }}
+                                >
+                                    <Trash class="w-4 h-4"/>
+                                    Delete Course
+                                </DropdownMenu.Item>
+                            </DropdownMenu.Group>
+                        </DropdownMenu.Content>
+                    </DropdownMenu.Root>
+
+                    <!-- Hidden Dialog Triggers and Dialog Content -->
+                    <!-- Add Module -->
                     <Dialog.Root>
-                        <Dialog.Trigger class={buttonVariants({ variant: "outline", size: "sm" })}
-                            > <Shapes class="w-4 h-4"/>Add Module</Dialog.Trigger
-                        >
+                        <Dialog.Trigger id="add-module-trigger" style="display: none" />
                         <Dialog.Content class="sm:max-w-[425px]">
                             <Dialog.Header>
-                            <Dialog.Title>Add Module</Dialog.Title>
-                            <Dialog.Description>
-                                Add new module to your course. Click save when you're done.
-                            </Dialog.Description>
+                                <Dialog.Title>Add Module</Dialog.Title>
+                                <Dialog.Description>
+                                    Add new module to your course. Click save when you're done.
+                                </Dialog.Description>
                             </Dialog.Header>
                             <div>
                                 <Input bind:value={newModuleTitle} placeholder="Module title (e.g. Introduction)" />
@@ -396,66 +460,57 @@
                             </Dialog.Footer>
                         </Dialog.Content>
                     </Dialog.Root>
-                    <Dialog.Root>
-                        <AlertDialog.Root>
-                            <AlertDialog.Trigger>
-                                <Button variant="destructive" size="sm" class="gap-2">
-                                    <Trash class="w-4 h-4" />
-                                    Delete Course
-                                </Button>
-                            </AlertDialog.Trigger>
-                            
-                            <AlertDialog.Content>
-                                <AlertDialog.Header>
+
+                    <!-- Delete Course -->
+                    <AlertDialog.Root>
+                        <AlertDialog.Trigger id="delete-course-trigger" style="display: none" />
+                        <AlertDialog.Content>
+                            <AlertDialog.Header>
                                 <AlertDialog.Title>Delete Course</AlertDialog.Title>
                                 <AlertDialog.Description>
-                                    This action will permanently delete this course, its modules, lessons, and the associated Data.
+                                    This action will permanently delete this course, its modules, lessons, and the associated data.
                                     <br />
                                     Are you sure you want to proceed?
                                 </AlertDialog.Description>
-                                </AlertDialog.Header>
-                            
-                                <AlertDialog.Footer>
-                                <AlertDialog.Cancel >Cancel</AlertDialog.Cancel>
-                                <AlertDialog.Action class={buttonVariants({ variant: "destructive"})}  onclick={handleDeleteCourse} disabled={isDeleting}>
+                            </AlertDialog.Header>
+                            <AlertDialog.Footer>
+                                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                                <AlertDialog.Action
+                                    class={buttonVariants({ variant: "destructive" })}
+                                    onclick={handleDeleteCourse}
+                                    disabled={isDeleting}
+                                >
                                     {#if isDeleting}
                                         <span class="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
                                     {/if}
                                     Confirm Delete
                                 </AlertDialog.Action>
-                                </AlertDialog.Footer>
-                            </AlertDialog.Content>
-                        </AlertDialog.Root>
+                            </AlertDialog.Footer>
+                        </AlertDialog.Content>
+                    </AlertDialog.Root>
 
-                        <Dialog.Trigger class={buttonVariants({ variant: "default", size: "sm" })}>
-                            <Pen class="w-4 h-4" />
-                            Edit Course
-                        </Dialog.Trigger>
-
+                    <!-- Edit Course -->
+                    <Dialog.Root>
+                        <Dialog.Trigger id="edit-course-trigger" style="display: none" />
                         <Dialog.Content class="sm:max-w-[800px] w-full h-[80%] overflow-auto">
                             <Dialog.Header>
                                 <Dialog.Title>Edit Course Details</Dialog.Title>
                             </Dialog.Header>
-
                             <div class="space-y-6">
                                 <div class="space-y-2">
                                     <label for="" class="text-sm font-medium text-gray-700">Course Title</label>
                                     <Input bind:value={title} placeholder="Enter course title" />
                                 </div>
-
                                 <div class="space-y-2">
                                     <label for="" class="text-sm font-medium text-gray-700">Course Description</label>
                                     <Textarea bind:value={description} rows={4} placeholder="Describe your course..." />
                                 </div>
-
                                 <div class="space-y-2">
                                     <label for="" class="text-sm font-medium text-gray-700">
-                                        Thumbnail URL
-                                        <span class="text-xs text-gray-500 font-normal">Recommended: 1280×720px</span>
+                                        Thumbnail URL <span class="text-xs text-gray-500 font-normal">Recommended: 1280×720px</span>
                                     </label>
                                     <Input bind:value={thumbnailUrl} placeholder="https://example.com/image.jpg" />
                                 </div>
-
                                 <div class="space-y-2">
                                     <label for="" class="text-sm font-medium text-gray-700">Preview</label>
                                     <div class="aspect-video w-full rounded-lg border overflow-hidden bg-gray-100">
@@ -610,16 +665,16 @@
                                             </div>
                                         </div>
                                     </Accordion.Trigger>
-                                    <Accordion.Content class="px-6 pb-4">
+                                    <Accordion.Content class="px-6 pb-4 bg-gray-50 ">
                                         <div class="space-y-3">
-                                            <!-- Add Lesson Button -->
-                                            <div class="flex gap-2 justify-end mb-4">
+                                            <div class="flex gap-2 justify-end mb-4 pt-2">
+                                                <!-- Edit Lessons -->
                                                 {#if mod.lessons.length > 0}
                                                     <Button
                                                         variant="secondary"
                                                         class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors {editModules[mod.id] 
                                                             ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
-                                                            : ''}"
+                                                            : 'bg-white hover:bg-white'}"
                                                         onclick={() => {
                                                             editModules[mod.id] = !editModules[mod.id];
                                                             if (!editModules[mod.id]) selectedFileIds[mod.id] = new Set();
@@ -634,7 +689,7 @@
                                                         {/if}
                                                     </Button>
                                                 {/if}
-
+                                                <!-- Add Lesson Button -->
                                                 <Dialog.Root>
                                                     <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 hover:border-blue-300">
                                                         <Plus class="w-4 h-4"/>
@@ -970,6 +1025,35 @@
                                                     </div>
                                                 {/each}
 
+                                                {#if editModules[mod.id] && mod.lessons.length > 0}
+                                                    <!-- Delete Module -->
+                                                    <AlertDialog.Root>
+                                                        <AlertDialog.Trigger class={buttonVariants({ variant: "destructive", className:"w-full mt-2" })}>
+                                                                <Trash class="w-4 h-4" />
+                                                                Delete Module
+                                                        </AlertDialog.Trigger>
+                                                    
+                                                        <AlertDialog.Content>
+                                                            <AlertDialog.Header>
+                                                                <AlertDialog.Title>Delete Module</AlertDialog.Title>
+                                                                <AlertDialog.Description>
+                                                                    This will permanently delete this module and all its associated lessons and video files.
+                                                                    Are you sure you want to proceed?
+                                                                </AlertDialog.Description>
+                                                            </AlertDialog.Header>
+                                                    
+                                                            <AlertDialog.Footer>
+                                                                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                                                                <AlertDialog.Action
+                                                                    class={buttonVariants({ variant: "destructive" })}
+                                                                    onclick={() => handleDeleteModule(mod.id)}
+                                                                >
+                                                                    Delete Module
+                                                                </AlertDialog.Action>
+                                                            </AlertDialog.Footer>
+                                                        </AlertDialog.Content>
+                                                    </AlertDialog.Root>
+                                                {/if}
                                                 <!-- Empty State -->
                                                 {#if mod.lessons.length === 0}
                                                     <div class="text-center py-8">

@@ -27,6 +27,15 @@ export const courses = pgTable("courses", {
   ]
 );
 
+export const courseThumbnails = pgTable('course_thumbnails', {
+	id: uuid('id').primaryKey().defaultRandom(),
+  name:text('name'),
+	courseId: uuid('course_id').notNull().references(() => courses.id, { onDelete: 'cascade' }),
+	fileId: text('file_id').notNull(),
+	location: text('location'),
+	createdAt: timestamp('created_at').defaultNow()
+});
+
 // Modules
 export const modules = pgTable("modules", {
   id: uuid("id").primaryKey().defaultRandom(),

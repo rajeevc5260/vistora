@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { db } from '$lib/server/db';
-import { courses } from '$lib/server/db/schema';
+import { courses, courseThumbnails } from '$lib/server/db/schema';
 import { trelae } from '$lib/utils/trelae';
 import { randomUUID } from 'crypto';
 
@@ -102,6 +102,16 @@ export async function POST({ request, locals }) {
             namespaceId: namespaceId
         })
         .returning({ id: courses.id });
+
+        // insert thumbnail record if uploaded
+        if (thumbnailFileId) {
+            await db.insert(courseThumbnails).values({
+                name:`${namespaceName}-thumbnail.png`,
+                courseId: course.id,
+                fileId: thumbnailFileId,
+                location: 'thumbnail',
+            });
+        }
 
     return json({ id: course.id });
 }

@@ -5,6 +5,14 @@
     import { goto } from "$app/navigation";
     import { toast } from "svelte-sonner";
     import { ArrowLeft, BookOpen, Image as ImageIcon, Sparkles, Eye } from "lucide-svelte";
+    import type { PageProps } from './$types';
+    import {
+        Avatar,
+        AvatarImage,
+        AvatarFallback,
+    } from "$lib/components/ui/avatar";
+
+    let { data }: PageProps = $props();
 
     let title = $state("");
     let description = $state("");
@@ -287,14 +295,6 @@
                                     alt="Course Thumbnail Preview"
                                     class="w-full h-full object-cover"
                                 />
-                                {#if !showPreview}
-                                    <div class="absolute inset-0 flex items-center justify-center">
-                                        <div class="text-center">
-                                            <ImageIcon class="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                                            <p class="text-sm text-gray-500">Add thumbnail URL to see preview</p>
-                                        </div>
-                                    </div>
-                                {/if}
                             </div>
 
                             <!-- Course Info -->
@@ -308,8 +308,16 @@
                                 
                                 <div class="flex items-center justify-between mt-4 pt-4 border-t">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 bg-gray-200 rounded-full"></div>
-                                        <span class="text-sm font-medium text-gray-700">Your Name</span>
+                                        <Avatar>
+                                            <AvatarImage
+                                                src={data.session.user.image ?? ""}
+                                                alt={data.session.user.name ?? "User"}
+                                            />
+                                            <AvatarFallback
+                                                >{data?.session?.user.name?.[0] ?? "U"}</AvatarFallback
+                                            >
+                                        </Avatar>
+                                        <span class="text-sm font-medium text-gray-700">{data.session.user.name}</span>
                                     </div>
                                     <div class="text-sm text-gray-500">
                                         Draft
