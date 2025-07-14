@@ -245,7 +245,7 @@
 						Back
 					</Button>
 					<div class="h-6 w-px bg-gray-300"></div>
-					<h1 class="text-xl font-semibold text-gray-900 truncate">
+					<h1 class="text-xl font-semibold text-gray-900 line-clamp-1">
 						Thumbnails for: {course.title}
 					</h1>
 				</div>
@@ -334,7 +334,7 @@
             <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {#each thumbnails as thumb (thumb.id)}
                     <div class="border rounded-xl overflow-hidden hover:shadow-lg transition-all group relative {data.course.thumbnailFileId === thumb.id ? "border-blue-500 shadow-lg" : ""}">
-                        <img src={thumb.url} alt={thumb.name} class="w-full aspect-video object-cover" />
+                        <img src={thumb.url} alt={thumb.name} class="w-full aspect-video object-cover cursor-pointer"  role="presentation" onclick={() => goto(`/dashboard/courses/${course.id}/thumbnails/${thumb.id}`)}/>
                         <div class="p-3 text-sm truncate text-gray-700">{thumb.name}</div>
                         <div class="flex item-center gap-2 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             {#if data.course.thumbnailFileId !== thumb.id}

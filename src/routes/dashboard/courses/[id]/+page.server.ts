@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { courses, users, modules, videos } from '$lib/server/db/schema';
+import { courses, users, modules, videos, courseMaterials } from '$lib/server/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { trelae } from '$lib/utils/trelae';
 
@@ -73,11 +73,29 @@ export const load: PageServerLoad = async ({ params }) => {
 		lessons: allVideos.filter((vid) => vid.moduleId === mod.id),
 	}));
 
+	const materials = await db
+		.select({
+			id: courseMaterials.id,
+			name: courseMaterials.name,
+			fileId: courseMaterials.fileId,
+			fileType: courseMaterials.fileType,
+		})
+		.from(courseMaterials)
+		.where(eq(courseMaterials.courseId, courseId));
+
+	const enrichedMaterials = await Promise.all(
+		materials.map(async (m) => {
+			const url = await trelae.file(m.fileId).getDownloadUrl();
+			return { ...m, url };
+		})
+	);
+
 	return {
 		course: {
 			...rawCourse,
 			thumbnailUrl,
 		},
 		modules: modulesWithLessons,
+		materials: enrichedMaterials,
 	};
 };

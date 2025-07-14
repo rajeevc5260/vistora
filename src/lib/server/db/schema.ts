@@ -57,6 +57,15 @@ export const videos = pgTable("videos", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const courseMaterials = pgTable("course_materials", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	courseId: uuid("course_id").notNull().references(() => courses.id, { onDelete: 'cascade' }),
+	name: text("name").notNull(),
+	fileId: text("file_id").notNull(),
+	fileType: text("file_type"), // "pdf", "zip", "image", etc.
+	location: text("location"), // Trelae storage location if needed
+	createdAt: timestamp("created_at").defaultNow(),
+});
 
 // Type exports
 export type User = typeof users.$inferSelect;
@@ -67,4 +76,6 @@ export type Module = typeof modules.$inferSelect;
 export type NewModule = typeof modules.$inferInsert;
 export type Video = typeof videos.$inferSelect;
 export type NewVideo = typeof videos.$inferInsert;
+export type CourseMaterial = typeof courseMaterials.$inferSelect;
+export type NewCourseMaterial = typeof courseMaterials.$inferInsert;
 

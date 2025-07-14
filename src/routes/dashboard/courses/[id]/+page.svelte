@@ -25,16 +25,17 @@
         X,
         Pencil,
         Plus,
-
-        GalleryThumbnails
-
+        GalleryThumbnails,
+        Download,
+        Archive,
+        File as FileIcon, 
+        FileImage
     } from "lucide-svelte";
     import { formatDuration, formatTotalDuration } from "$lib/utils/formatTime";
     import { loadVideoFromFirstLesson } from "$lib/utils/loadFirstVideo";
     import * as Tooltip from "$lib/components/ui/tooltip/index.js";
     import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
-
 
     let { data }: PageProps = $props();
     let { course, modules } = data;
@@ -69,12 +70,6 @@
     function goBack() {
         goto("/dashboard/courses");
     }
-
-    const materials = [
-        { name: "Course Outline.pdf", icon: FileText, link: "#" },
-        { name: "Design Mockup.png", icon: ImageIcon, link: "#" },
-        { name: "Assets.zip", icon: FileText, link: "#" },
-    ];
 
     const tabs = [
         { id: "overview", label: "Overview", icon: BookOpen },
@@ -372,6 +367,127 @@
         }
     }
 
+
+    // Material 
+    let selectedMaterialFile: File | null = $state(null);
+    let materialPreviewUrl: string = $state('');
+
+    let editMaterials: boolean = $state(false);
+    let selectedMaterialIds: Set<string> = $state(new Set());
+    let materialTitle: string = $state('');
+    let materialDescription: string = $state('');
+
+    // Add this function to handle bulk delete of materials
+    async function handleBulkDeleteMaterials() {
+        if (selectedMaterialIds.size === 0) return;
+
+        try {
+            const toastId = toast.loading("Deleting materials...", { duration: Infinity });
+            
+            const deletePromises = Array.from(selectedMaterialIds).map(async (materialId) => {
+                const res = await fetch(`/api/courses/${course.id}/materials/${materialId}`, {
+                    method: "DELETE"
+                });
+                if (!res.ok) throw new Error(`Failed to delete material ${materialId}`);
+            });
+
+            await Promise.all(deletePromises);
+            
+            toast.success("Materials deleted successfully", { id: toastId });
+            selectedMaterialIds = new Set();
+            editMaterials = false;
+            await goto(location.pathname, { invalidateAll: true });
+        } catch (err) {
+            console.error("Materials delete error:", err);
+            toast.error("Failed to delete materials");
+        }
+    }
+
+    // Update the uploadMaterial function to use the form data
+    async function uploadMaterial(file: File) {
+        if (!course?.id) {
+            toast.error("Course ID is missing. Cannot upload material.");
+            return;
+        }
+
+        if (!materialTitle.trim()) {
+            toast.error("Material title is required");
+            return;
+        }
+
+        try {
+            const toastId = toast.loading("Uploading material...", { duration: Infinity });
+            
+            // Step 1: Get Presigned URL
+            const presignRes = await fetch(`/api/courses/${course.id}/materials`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: file.name,
+                    type: file.type,
+                    title: materialTitle,
+                    description: materialDescription
+                }),
+            });
+
+            if (!presignRes.ok) {
+                toast.error('Failed to get upload URL', { id: toastId });
+                return;
+            }
+
+            const { fileId, uploadUrl, location } = await presignRes.json();
+
+            // Step 2: Upload to S3 using presigned URL
+            const uploadRes = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: file,
+                headers: {
+                    'Content-Type': file.type || 'application/octet-stream',
+                },
+            });
+
+            if (!uploadRes.ok) {
+                toast.error('Upload failed');
+                return;
+            }
+
+
+            // Step 3: Insert into DB using server-side endpoint
+            const saveRes = await fetch(`/api/courses/${course.id}/materials/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileId,
+                    name: file.name,
+                    type: file.type,
+                    location,
+                }),
+            });
+
+            if (!saveRes.ok) {
+                toast.error('Failed to save to database', { id: toastId });
+                return;
+            }
+
+            toast.success('Material uploaded successfully', { id: toastId });
+            
+            // Reset form
+            selectedMaterialFile = null;
+            materialPreviewUrl = '';
+            materialTitle = '';
+            materialDescription = '';
+            
+            // Close dialog and refresh
+            document.getElementById('material-dialog-close')?.click();
+            setTimeout(() => {
+                goto(`/dashboard/courses/${course.id}`, { invalidateAll: true });
+            }, 1000);
+            
+        } catch (err) {
+            console.error("Material upload error:", err);
+            toast.error("Failed to upload material");
+        }
+    }
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -1069,6 +1185,294 @@
                                     </Accordion.Content>
                                 </Accordion.Item>
                             {/each}
+                            <Accordion.Item value="course-materials" class="border-b-0">
+                                <Accordion.Trigger class="px-6 py-4 hover:bg-gray-50 text-left w-full">
+                                    <div class="flex items-center justify-between w-full">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                                <FileText class="w-4 h-4 text-green-600" />
+                                            </div>
+                                            <div>
+                                                <p class="font-medium text-gray-900">Course Materials</p>
+                                                <p class="text-sm text-gray-500">{data.materials?.length || 0} materials</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Accordion.Trigger>
+                            
+                                <Accordion.Content class="px-6 pb-4 bg-gray-50">
+                                    <div class="space-y-3">
+                                        <!-- Action Buttons -->
+                                        <div class="flex gap-2 justify-end mb-4 pt-2">
+                                            {#if data.materials?.length > 0}
+                                                <!-- Edit Button -->
+                                                <Button
+                                                    variant="secondary"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors 
+                                                    {editMaterials 
+                                                        ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
+                                                        : 'bg-white hover:bg-white'}"
+                                                    onclick={() => {
+                                                        editMaterials = !editMaterials;
+                                                        if (!editMaterials) selectedMaterialIds = new Set();
+                                                    }}
+                                                >
+                                                    {#if editMaterials}
+                                                        <X class="w-4 h-4" />
+                                                        Cancel
+                                                    {:else}
+                                                        <Pencil class="w-4 h-4" />
+                                                        Edit
+                                                    {/if}
+                                                </Button>
+                                            {/if}
+                            
+                                            <!-- Add Material Dialog -->
+                                            <Dialog.Root>
+                                                <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200 hover:border-green-300">
+                                                    <Plus class="w-4 h-4" />
+                                                    Add Material
+                                                </Dialog.Trigger>
+                            
+                                                <Dialog.Content class="sm:max-w-[500px] overflow-auto max-h-[80%]">
+                                                    <Dialog.Header>
+                                                        <Dialog.Title class="text-xl font-semibold text-gray-900">
+                                                            Upload Course Material
+                                                        </Dialog.Title>
+                                                        <Dialog.Description class="text-gray-600">
+                                                            Upload a PDF, ZIP, or image file for your course. Max 100 MB.
+                                                        </Dialog.Description>
+                                                    </Dialog.Header>
+                            
+                                                    <div class="space-y-6 py-4">
+                                                        <!-- File Upload -->
+                                                        <div class="space-y-2">
+                                                            <label for="" class="block text-sm font-medium text-gray-700">File</label>
+                                                            <div class="relative">
+                                                                <input
+                                                                    id="material-file-input"
+                                                                    type="file"
+                                                                    accept=".pdf,.zip,image/*"
+                                                                    class="hidden"
+                                                                    onchange={(e) => {
+                                                                        const file = e.currentTarget?.files?.[0];
+                                                                        if (!file) return;
+                                                                        selectedMaterialFile = file;
+                                                                        materialPreviewUrl = file.type.startsWith('image/')
+                                                                            ? URL.createObjectURL(file)
+                                                                            : '';
+                                                                    }}
+                                                                />
+                                                                <label
+                                                                    for="material-file-input"
+                                                                    class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+                                                                >
+                                                                    {#if selectedMaterialFile}
+                                                                        <div class="flex items-center gap-3 text-green-600">
+                                                                            <FileText class="w-8 h-8" />
+                                                                            <div class="text-left">
+                                                                                <p class="text-sm font-medium">{selectedMaterialFile.name}</p>
+                                                                                <p class="text-xs text-gray-500">
+                                                                                    {(selectedMaterialFile.size / 1024 / 1024).toFixed(1)} MB
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    {:else}
+                                                                        <div class="flex flex-col items-center justify-center">
+                                                                            <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                            </svg>
+                                                                            <p class="mb-2 text-sm text-gray-500">
+                                                                                <span class="font-semibold">Click to upload</span> or drag and drop
+                                                                            </p>
+                                                                            <p class="text-xs text-gray-500">PDF, ZIP, Images (MAX. 100MB)</p>
+                                                                        </div>
+                                                                    {/if}
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                            
+                                                        <!-- Title -->
+                                                        <div class="space-y-2">
+                                                            <label for="" class="block text-sm font-medium text-gray-700">Material Title</label>
+                                                            <Input bind:value={materialTitle} placeholder="Enter material title..." class="w-full" />
+                                                        </div>
+                            
+                                                        <!-- Description -->
+                                                        <div class="space-y-2">
+                                                            <label for="" class="block text-sm font-medium text-gray-700">
+                                                                Description <span class="text-gray-500 font-normal">(Optional)</span>
+                                                            </label>
+                                                            <Textarea
+                                                                bind:value={materialDescription}
+                                                                placeholder="Describe this material and how it helps students..."
+                                                                rows={3}
+                                                                class="w-full resize-none"
+                                                            />
+                                                        </div>
+                                                    </div>
+                            
+                                                    <!-- Image Preview -->
+                                                    {#if materialPreviewUrl}
+                                                        <div class="aspect-video w-full border rounded-lg bg-gray-100">
+                                                            <img src={materialPreviewUrl} alt="Preview" class="w-full h-full object-contain" />
+                                                        </div>
+                                                    {/if}
+                            
+                                                    <!-- Footer -->
+                                                    <Dialog.Footer class="flex gap-3 pt-6">
+                                                        <Dialog.Close>
+                                                            <Button variant="outline" class="flex-1" id="material-dialog-close">Cancel</Button>
+                                                        </Dialog.Close>
+                                                        <Button
+                                                            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                                                            disabled={!selectedMaterialFile || !materialTitle.trim()}
+                                                            onclick={() => {
+                                                                if (selectedMaterialFile) uploadMaterial(selectedMaterialFile);
+                                                            }}
+                                                        >
+                                                            Upload
+                                                        </Button>
+                                                    </Dialog.Footer>
+                                                </Dialog.Content>
+                                            </Dialog.Root>
+                                        </div>
+                            
+                                        <!-- Bulk Select Controls (only shown when editing) -->
+                                        {#if editMaterials && data.materials?.length > 0}
+                                            <div class="mb-4">
+                                                <div class="flex flex-col gap-3 items-start">
+                                                    <label class="flex items-center gap-3 text-sm font-medium text-gray-700 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                            onchange={(e) => {
+                                                                const checked = e.currentTarget.checked;
+                                                                selectedMaterialIds = new Set(
+                                                                    checked ? data.materials.map(m => m.id) : []
+                                                                );
+                                                            }}
+                                                            checked={selectedMaterialIds.size === data.materials?.length && data.materials?.length > 0}
+                                                        />
+                                                        <span class="select-none">Select all materials</span>
+                                                    </label>
+                            
+                                                    {#if selectedMaterialIds.size > 0}
+                                                        <AlertDialog.Root>
+                                                            <AlertDialog.Trigger>
+                                                                <Button
+                                                                    variant="destructive"
+                                                                    size="sm"
+                                                                    class="ml-[25px] px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 hover:border-red-300 rounded-lg transition-colors"
+                                                                >
+                                                                    <Trash class="w-4 h-4 mr-2" />
+                                                                    Delete selected ({selectedMaterialIds.size})
+                                                                </Button>
+                                                            </AlertDialog.Trigger>
+                            
+                                                            <AlertDialog.Content>
+                                                                <AlertDialog.Header>
+                                                                    <AlertDialog.Title>Confirm Delete</AlertDialog.Title>
+                                                                    <AlertDialog.Description>
+                                                                        Are you sure you want to delete the {selectedMaterialIds.size} selected material{selectedMaterialIds.size > 1 ? 's' : ''}?
+                                                                        This action cannot be undone.
+                                                                    </AlertDialog.Description>
+                                                                </AlertDialog.Header>
+                            
+                                                                <AlertDialog.Footer>
+                                                                    <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                                                                    <AlertDialog.Action 
+                                                                        class={buttonVariants({ variant: "destructive"})}  
+                                                                        onclick={handleBulkDeleteMaterials}
+                                                                    >
+                                                                        Confirm Delete
+                                                                    </AlertDialog.Action>
+                                                                </AlertDialog.Footer>
+                                                            </AlertDialog.Content>
+                                                        </AlertDialog.Root>
+                                                    {/if}
+                                                </div>
+                                            </div>
+                                        {/if}
+                            
+                                        <!-- Materials List -->
+                                        <div class="space-y-2">
+                                            {#if data.materials?.length > 0}
+                                                {#each data.materials as material}
+                                                    <div class="flex items-center">
+                                                        {#if editMaterials}
+                                                            <div class="mr-3 flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                                                    checked={selectedMaterialIds.has(material.id)}
+                                                                    onchange={(e) => {
+                                                                        const checked = e.currentTarget.checked;
+                                                                        const newSet = new Set(selectedMaterialIds);
+                                                                        if (checked) {
+                                                                            newSet.add(material.id);
+                                                                        } else {
+                                                                            newSet.delete(material.id);
+                                                                        }
+                                                                        selectedMaterialIds = newSet;
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        {/if}
+                            
+                                                        <div class="group flex items-center justify-between p-4 rounded-xl transition-all duration-200 w-full bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm">
+                                                            <div class="flex items-center gap-4">
+                                                                <!-- Material Icon -->
+                                                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                                                    {#if material.fileType?.includes('pdf')}
+                                                                        <FileText class="w-5 h-5 text-green-600" />
+                                                                    {:else if material.fileType?.includes('zip') || material.fileType?.includes('archive')}
+                                                                        <Archive class="w-5 h-5 text-green-600" />
+                                                                    {:else if material.fileType?.includes('image')}
+                                                                        <FileImage class="w-5 h-5 text-green-600" />
+                                                                    {:else}
+                                                                        <FileIcon class="w-5 h-5 text-green-600" />
+                                                                    {/if}
+                                                                </div>
+                            
+                                                                <!-- Material Info -->
+                                                                <div class="flex-1 text-left">
+                                                                    <h4 class="font-medium text-gray-900 group-hover:text-green-600 transition-colors line-clamp-1">
+                                                                        { material.name}
+                                                                    </h4>
+                                                                </div>
+                                                            </div>
+                            
+                                                            <!-- Download Button -->
+                                                            <div class="flex items-center gap-2">
+                                                                <a
+                                                                    href={material.url}
+                                                                    target="_blank"
+                                                                    download={material.name}
+                                                                    class="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 hover:bg-green-100 group-hover:bg-green-100 transition-colors"
+                                                                    title="Download"
+                                                                >
+                                                                    <Download class="w-4 h-4 text-gray-600 group-hover:text-green-600" />
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {/each}
+                                            {:else}
+                                                <!-- Empty State -->
+                                                <div class="text-center py-8">
+                                                    <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                        <FileText class="w-6 h-6 text-gray-400" />
+                                                    </div>
+                                                    <p class="text-sm text-gray-500 mb-2">No materials yet</p>
+                                                    <p class="text-xs text-gray-400">Upload your first course material to get started</p>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                </Accordion.Content>
+                            </Accordion.Item>                         
                         </Accordion.Root>
                     </div>
                 </div>
