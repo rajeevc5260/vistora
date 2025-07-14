@@ -340,7 +340,7 @@
                             {#if data.course.thumbnailFileId !== thumb.id}
                                 <AlertDialog.Root>
                                     <AlertDialog.Trigger class={buttonVariants({ variant: "secondary" })}>
-                                            <Star class="w-4 h-4 text-yellow-500" fill="#F59E0B" strokeWidth={0}/>
+                                            <Star class="w-4 h-4 text-yellow-500"/>
                                     </AlertDialog.Trigger>
                                     <AlertDialog.Content class="max-w-md w-full rounded-xl p-6">
                                         <AlertDialog.Title class="text-lg font-bold text-gray-900">

@@ -10,6 +10,11 @@
     Settings,
   } from "lucide-svelte";
   import type { PageProps } from "./$types";
+  import {
+        Avatar,
+        AvatarImage,
+        AvatarFallback,
+    } from "$lib/components/ui/avatar";
   import { goto } from "$app/navigation";
 
   let { data }: PageProps = $props();
@@ -22,12 +27,15 @@
     class="rounded-2xl border shadow-sm p-6 bg-white flex items-center gap-6"
   >
     <div class="relative">
-      <img
-        src={user?.image ?? "/placeholder-avatar.png"}
-        alt="User Avatar"
-        class="w-16 h-16 rounded-full border-2 border-gray-100 shadow-sm object-cover"
-      />
-
+      <Avatar class="w-16 h-16">
+          <AvatarImage
+              src={user?.image ?? ""}
+              alt={user?.name ?? "User"}
+          />
+          <AvatarFallback
+              >{user?.name?.[0] ?? "U"}</AvatarFallback
+          >
+      </Avatar>
       <div
         class="absolute -bottom-0 -right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"
       ></div>
