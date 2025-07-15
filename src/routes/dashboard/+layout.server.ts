@@ -7,5 +7,6 @@ export const load = async (event: any) => {
         throw redirect(302, "/login");
     }
 
+    console.log("session", session )
     return { session };
 };

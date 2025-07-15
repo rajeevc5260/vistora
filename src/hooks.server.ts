@@ -45,6 +45,8 @@ export const handle = SvelteKitAuth({
 
       if (dbUser && session.user) {
         session.user.id = dbUser.id;
+        //@ts-expect-error
+        session.user.role = dbUser.role;
       }
 
       return session;
