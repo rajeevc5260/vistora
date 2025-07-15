@@ -374,32 +374,38 @@
 
     let editMaterials: boolean = $state(false);
     let selectedMaterialIds: Set<string> = $state(new Set());
-    let materialTitle: string = $state('');
-    let materialDescription: string = $state('');
 
     // Add this function to handle bulk delete of materials
     async function handleBulkDeleteMaterials() {
         if (selectedMaterialIds.size === 0) return;
 
+        console.log("Array.from(selectedMaterialIds)", selectedMaterialIds)
         try {
             const toastId = toast.loading("Deleting materials...", { duration: Infinity });
-            
-            const deletePromises = Array.from(selectedMaterialIds).map(async (materialId) => {
-                const res = await fetch(`/api/courses/${course.id}/materials/${materialId}`, {
-                    method: "DELETE"
-                });
-                if (!res.ok) throw new Error(`Failed to delete material ${materialId}`);
+
+            const res = await fetch(`/api/courses/${course.id}/materials/bulk-delete`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    materialIds: Array.from(selectedMaterialIds),
+                }),
             });
 
-            await Promise.all(deletePromises);
-            
+            if (!res.ok) {
+                const err = await res.json();
+                toast.error(err.error || "Failed to delete materials", { id: toastId });
+                return;
+            }
+
             toast.success("Materials deleted successfully", { id: toastId });
             selectedMaterialIds = new Set();
             editMaterials = false;
+
+            // Refresh UI
             await goto(location.pathname, { invalidateAll: true });
         } catch (err) {
-            console.error("Materials delete error:", err);
-            toast.error("Failed to delete materials");
+            console.error("Bulk delete error:", err);
+            toast.error("Unexpected error while deleting materials");
         }
     }
 
@@ -407,11 +413,6 @@
     async function uploadMaterial(file: File) {
         if (!course?.id) {
             toast.error("Course ID is missing. Cannot upload material.");
-            return;
-        }
-
-        if (!materialTitle.trim()) {
-            toast.error("Material title is required");
             return;
         }
 
@@ -425,8 +426,6 @@
                 body: JSON.stringify({
                     name: file.name,
                     type: file.type,
-                    title: materialTitle,
-                    description: materialDescription
                 }),
             });
 
@@ -474,19 +473,24 @@
             // Reset form
             selectedMaterialFile = null;
             materialPreviewUrl = '';
-            materialTitle = '';
-            materialDescription = '';
             
             // Close dialog and refresh
-            document.getElementById('material-dialog-close')?.click();
+            
             setTimeout(() => {
                 goto(`/dashboard/courses/${course.id}`, { invalidateAll: true });
-            }, 1000);
-            
+            }, 2000);
+            document.getElementById('material-dialog-close')?.click();
         } catch (err) {
             console.error("Material upload error:", err);
             toast.error("Failed to upload material");
         }
+    }
+
+    function formatFileSize(bytes: number): string {
+        if (bytes < 1024 * 1024) {
+            return `${(bytes / 1024).toFixed(1)} KB`;
+        }
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
 </script>
 
@@ -1273,7 +1277,7 @@
                                                                             <div class="text-left">
                                                                                 <p class="text-sm font-medium">{selectedMaterialFile.name}</p>
                                                                                 <p class="text-xs text-gray-500">
-                                                                                    {(selectedMaterialFile.size / 1024 / 1024).toFixed(1)} MB
+                                                                                    {formatFileSize(selectedMaterialFile.size)}
                                                                                 </p>
                                                                             </div>
                                                                         </div>
@@ -1292,25 +1296,6 @@
                                                                 </label>
                                                             </div>
                                                         </div>
-                            
-                                                        <!-- Title -->
-                                                        <div class="space-y-2">
-                                                            <label for="" class="block text-sm font-medium text-gray-700">Material Title</label>
-                                                            <Input bind:value={materialTitle} placeholder="Enter material title..." class="w-full" />
-                                                        </div>
-                            
-                                                        <!-- Description -->
-                                                        <div class="space-y-2">
-                                                            <label for="" class="block text-sm font-medium text-gray-700">
-                                                                Description <span class="text-gray-500 font-normal">(Optional)</span>
-                                                            </label>
-                                                            <Textarea
-                                                                bind:value={materialDescription}
-                                                                placeholder="Describe this material and how it helps students..."
-                                                                rows={3}
-                                                                class="w-full resize-none"
-                                                            />
-                                                        </div>
                                                     </div>
                             
                                                     <!-- Image Preview -->
@@ -1327,7 +1312,7 @@
                                                         </Dialog.Close>
                                                         <Button
                                                             class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                                                            disabled={!selectedMaterialFile || !materialTitle.trim()}
+                                                            disabled={!selectedMaterialFile}
                                                             onclick={() => {
                                                                 if (selectedMaterialFile) uploadMaterial(selectedMaterialFile);
                                                             }}

@@ -26,6 +26,7 @@ export async function GET({ url }) {
 
 	// Clone headers and set CORS
 	const headers = new Headers(res.headers);
+    console.log("headers", headers)
 	headers.set('Access-Control-Allow-Origin', '*');
 
 	// Stream the response directly without buffering

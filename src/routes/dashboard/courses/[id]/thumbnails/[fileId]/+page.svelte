@@ -78,6 +78,24 @@
         if (!isEditing || !canvasRef) return;
 
         const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(data.thumbnail.url)}`;
+
+        (async () => {
+            try {
+                const res = await fetch(proxyUrl, { method: 'HEAD' });
+
+                const contentType = res.headers.get('content-type') || '';
+                const ext = contentType.split('/')[1]?.split(';')[0];
+
+                if (['jpeg', 'png', 'webp'].includes(ext)) {
+                    convert = ext;
+                } else {
+                    convert = '';
+                }
+            } catch (err) {
+                console.error('Failed to fetch content-type:', err);
+                convert = '';
+            }
+        })();
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.src = proxyUrl;
