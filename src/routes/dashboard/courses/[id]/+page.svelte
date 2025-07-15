@@ -40,6 +40,9 @@
     let { data }: PageProps = $props();
     let { course, modules } = data;
 
+    const userRole = data.session?.user?.role || 'viewer';
+    const isInstructor = userRole === 'instructor';
+
     let title = $state(course.title);
     let description = $state(course.description || "");
     let thumbnailUrl = $state(course.thumbnailUrl || "");
@@ -510,146 +513,148 @@
                     </h1>
                 </div>
                 
-                <div class="flex items-center gap-3">
-                   <!-- Course Management Dropdown -->
-                    <DropdownMenu.Root>
-                        <DropdownMenu.Trigger>
-                            <Button variant="outline" size="sm" class="gap-2">
-                                <Settings class="w-4 h-4" />
-                                Manage Course
-                            </Button>
-                        </DropdownMenu.Trigger>
+                {#if isInstructor}
+                    <div class="flex items-center gap-3">
+                    <!-- Course Management Dropdown -->
+                        <DropdownMenu.Root>
+                            <DropdownMenu.Trigger>
+                                <Button variant="outline" size="sm" class="gap-2">
+                                    <Settings class="w-4 h-4" />
+                                    Manage Course
+                                </Button>
+                            </DropdownMenu.Trigger>
 
-                        <DropdownMenu.Content align="end" class="w-[220px]">
-                            <DropdownMenu.Group>
-                                <DropdownMenu.Label>Course Options</DropdownMenu.Label>
-                                <DropdownMenu.Separator />
-                                <DropdownMenu.Item onclick={() => goto(`/dashboard/courses/${course.id}/thumbnails`)}>
-                                    <GalleryThumbnails class="w-4 h-4"/>
-                                    Thumbnails
-                                </DropdownMenu.Item>
+                            <DropdownMenu.Content align="end" class="w-[220px]">
+                                <DropdownMenu.Group>
+                                    <DropdownMenu.Label>Course Options</DropdownMenu.Label>
+                                    <DropdownMenu.Separator />
+                                    <DropdownMenu.Item onclick={() => goto(`/dashboard/courses/${course.id}/thumbnails`)}>
+                                        <GalleryThumbnails class="w-4 h-4"/>
+                                        Thumbnails
+                                    </DropdownMenu.Item>
 
-                                <DropdownMenu.Item
-                                    onclick={() => {
-                                        document.getElementById('add-module-trigger')?.click();
-                                    }}
-                                >
-                                    <Shapes class="w-4 h-4" />
-                                    Add Module
-                                </DropdownMenu.Item>
-                                <DropdownMenu.Item
-                                    onclick={() => {
-                                        document.getElementById('edit-course-trigger')?.click();
-                                    }}
-                                >
-                                    <Pen class="w-4 h-4" />
-                                    Edit Course
-                                </DropdownMenu.Item>
-                                <DropdownMenu.Item
-                                    onclick={() => {
-                                        document.getElementById('delete-course-trigger')?.click();
-                                    }}
-                                >
-                                    <Trash class="w-4 h-4"/>
-                                    Delete Course
-                                </DropdownMenu.Item>
-                            </DropdownMenu.Group>
-                        </DropdownMenu.Content>
-                    </DropdownMenu.Root>
-
-                    <!-- Hidden Dialog Triggers and Dialog Content -->
-                    <!-- Add Module -->
-                    <Dialog.Root>
-                        <Dialog.Trigger id="add-module-trigger" style="display: none" />
-                        <Dialog.Content class="sm:max-w-[425px]">
-                            <Dialog.Header>
-                                <Dialog.Title>Add Module</Dialog.Title>
-                                <Dialog.Description>
-                                    Add new module to your course. Click save when you're done.
-                                </Dialog.Description>
-                            </Dialog.Header>
-                            <div>
-                                <Input bind:value={newModuleTitle} placeholder="Module title (e.g. Introduction)" />
-                            </div>
-                            <Dialog.Footer>
-                                <Dialog.Close>
-                                    <Button class="w-full" type="submit" onclick={handleAddModule}>
+                                    <DropdownMenu.Item
+                                        onclick={() => {
+                                            document.getElementById('add-module-trigger')?.click();
+                                        }}
+                                    >
+                                        <Shapes class="w-4 h-4" />
                                         Add Module
-                                    </Button>
-                                </Dialog.Close>
-                            </Dialog.Footer>
-                        </Dialog.Content>
-                    </Dialog.Root>
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                        onclick={() => {
+                                            document.getElementById('edit-course-trigger')?.click();
+                                        }}
+                                    >
+                                        <Pen class="w-4 h-4" />
+                                        Edit Course
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                        onclick={() => {
+                                            document.getElementById('delete-course-trigger')?.click();
+                                        }}
+                                    >
+                                        <Trash class="w-4 h-4"/>
+                                        Delete Course
+                                    </DropdownMenu.Item>
+                                </DropdownMenu.Group>
+                            </DropdownMenu.Content>
+                        </DropdownMenu.Root>
 
-                    <!-- Delete Course -->
-                    <AlertDialog.Root>
-                        <AlertDialog.Trigger id="delete-course-trigger" style="display: none" />
-                        <AlertDialog.Content>
-                            <AlertDialog.Header>
-                                <AlertDialog.Title>Delete Course</AlertDialog.Title>
-                                <AlertDialog.Description>
-                                    This action will permanently delete this course, its modules, lessons, and the associated data.
-                                    <br />
-                                    Are you sure you want to proceed?
-                                </AlertDialog.Description>
-                            </AlertDialog.Header>
-                            <AlertDialog.Footer>
-                                <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-                                <AlertDialog.Action
-                                    class={buttonVariants({ variant: "destructive" })}
-                                    onclick={handleDeleteCourse}
-                                    disabled={isDeleting}
-                                >
-                                    {#if isDeleting}
-                                        <span class="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
-                                    {/if}
-                                    Confirm Delete
-                                </AlertDialog.Action>
-                            </AlertDialog.Footer>
-                        </AlertDialog.Content>
-                    </AlertDialog.Root>
-
-                    <!-- Edit Course -->
-                    <Dialog.Root>
-                        <Dialog.Trigger id="edit-course-trigger" style="display: none" />
-                        <Dialog.Content class="sm:max-w-[800px] w-full h-[80%] overflow-auto">
-                            <Dialog.Header>
-                                <Dialog.Title>Edit Course Details</Dialog.Title>
-                            </Dialog.Header>
-                            <div class="space-y-6">
-                                <div class="space-y-2">
-                                    <label for="" class="text-sm font-medium text-gray-700">Course Title</label>
-                                    <Input bind:value={title} placeholder="Enter course title" />
+                        <!-- Hidden Dialog Triggers and Dialog Content -->
+                        <!-- Add Module -->
+                        <Dialog.Root>
+                            <Dialog.Trigger id="add-module-trigger" style="display: none" />
+                            <Dialog.Content class="sm:max-w-[425px]">
+                                <Dialog.Header>
+                                    <Dialog.Title>Add Module</Dialog.Title>
+                                    <Dialog.Description>
+                                        Add new module to your course. Click save when you're done.
+                                    </Dialog.Description>
+                                </Dialog.Header>
+                                <div>
+                                    <Input bind:value={newModuleTitle} placeholder="Module title (e.g. Introduction)" />
                                 </div>
-                                <div class="space-y-2">
-                                    <label for="" class="text-sm font-medium text-gray-700">Course Description</label>
-                                    <Textarea bind:value={description} rows={4} placeholder="Describe your course..." />
-                                </div>
-                                <div class="space-y-2">
-                                    <label for="" class="text-sm font-medium text-gray-700">
-                                        Thumbnail URL <span class="text-xs text-gray-500 font-normal">Recommended: 1280×720px</span>
-                                    </label>
-                                    <Input bind:value={thumbnailUrl} placeholder="https://example.com/image.jpg" />
-                                </div>
-                                <div class="space-y-2">
-                                    <label for="" class="text-sm font-medium text-gray-700">Preview</label>
-                                    <div class="aspect-video w-full rounded-lg border overflow-hidden bg-gray-100">
-                                        <img
-                                            src={showPreview ? thumbnailUrl : fallbackImage}
-                                            alt="Thumbnail Preview"
-                                            class="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                </div>
-                                <Dialog.Footer class="w-full">
-                                    <Button type="submit" class="w-full" onclick={handleUpdate}>
-                                        Save Changes
-                                    </Button>
+                                <Dialog.Footer>
+                                    <Dialog.Close>
+                                        <Button class="w-full" type="submit" onclick={handleAddModule}>
+                                            Add Module
+                                        </Button>
+                                    </Dialog.Close>
                                 </Dialog.Footer>
-                            </div>
-                        </Dialog.Content>
-                    </Dialog.Root>
-                </div>
+                            </Dialog.Content>
+                        </Dialog.Root>
+
+                        <!-- Delete Course -->
+                        <AlertDialog.Root>
+                            <AlertDialog.Trigger id="delete-course-trigger" style="display: none" />
+                            <AlertDialog.Content>
+                                <AlertDialog.Header>
+                                    <AlertDialog.Title>Delete Course</AlertDialog.Title>
+                                    <AlertDialog.Description>
+                                        This action will permanently delete this course, its modules, lessons, and the associated data.
+                                        <br />
+                                        Are you sure you want to proceed?
+                                    </AlertDialog.Description>
+                                </AlertDialog.Header>
+                                <AlertDialog.Footer>
+                                    <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+                                    <AlertDialog.Action
+                                        class={buttonVariants({ variant: "destructive" })}
+                                        onclick={handleDeleteCourse}
+                                        disabled={isDeleting}
+                                    >
+                                        {#if isDeleting}
+                                            <span class="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                        {/if}
+                                        Confirm Delete
+                                    </AlertDialog.Action>
+                                </AlertDialog.Footer>
+                            </AlertDialog.Content>
+                        </AlertDialog.Root>
+
+                        <!-- Edit Course -->
+                        <Dialog.Root>
+                            <Dialog.Trigger id="edit-course-trigger" style="display: none" />
+                            <Dialog.Content class="sm:max-w-[800px] w-full h-[80%] overflow-auto">
+                                <Dialog.Header>
+                                    <Dialog.Title>Edit Course Details</Dialog.Title>
+                                </Dialog.Header>
+                                <div class="space-y-6">
+                                    <div class="space-y-2">
+                                        <label for="" class="text-sm font-medium text-gray-700">Course Title</label>
+                                        <Input bind:value={title} placeholder="Enter course title" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label for="" class="text-sm font-medium text-gray-700">Course Description</label>
+                                        <Textarea bind:value={description} rows={4} placeholder="Describe your course..." />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label for="" class="text-sm font-medium text-gray-700">
+                                            Thumbnail URL <span class="text-xs text-gray-500 font-normal">Recommended: 1280×720px</span>
+                                        </label>
+                                        <Input bind:value={thumbnailUrl} placeholder="https://example.com/image.jpg" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label for="" class="text-sm font-medium text-gray-700">Preview</label>
+                                        <div class="aspect-video w-full rounded-lg border overflow-hidden bg-gray-100">
+                                            <img
+                                                src={showPreview ? thumbnailUrl : fallbackImage}
+                                                alt="Thumbnail Preview"
+                                                class="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                    </div>
+                                    <Dialog.Footer class="w-full">
+                                        <Button type="submit" class="w-full" onclick={handleUpdate}>
+                                            Save Changes
+                                        </Button>
+                                    </Dialog.Footer>
+                                </div>
+                            </Dialog.Content>
+                        </Dialog.Root>
+                    </div>
+                {/if}
             </div>
         </div>
     </div>
@@ -787,161 +792,163 @@
                                     </Accordion.Trigger>
                                     <Accordion.Content class="px-6 pb-4 bg-gray-50 ">
                                         <div class="space-y-3">
-                                            <div class="flex gap-2 justify-end mb-4 pt-2">
-                                                <!-- Edit Lessons -->
-                                                {#if mod.lessons.length > 0}
-                                                    <Button
-                                                        variant="secondary"
-                                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors {editModules[mod.id] 
-                                                            ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
-                                                            : 'bg-white hover:bg-white'}"
-                                                        onclick={() => {
-                                                            editModules[mod.id] = !editModules[mod.id];
-                                                            if (!editModules[mod.id]) selectedFileIds[mod.id] = new Set();
-                                                        }}
-                                                    >
-                                                        {#if editModules[mod.id]}
-                                                            <X class="w-4 h-4"/>
-                                                            Cancel
-                                                        {:else}
-                                                            <Pencil class="w-4 h-4"/>
-                                                            Edit
-                                                        {/if}
-                                                    </Button>
-                                                {/if}
-                                                <!-- Add Lesson Button -->
-                                                <Dialog.Root>
-                                                    <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 hover:border-blue-300">
-                                                        <Plus class="w-4 h-4"/>
-                                                        Add Lesson
-                                                    </Dialog.Trigger>
+                                            {#if isInstructor}
+                                                <div class="flex gap-2 justify-end mb-4 pt-2">
+                                                    <!-- Edit Lessons -->
+                                                    {#if mod.lessons.length > 0}
+                                                        <Button
+                                                            variant="secondary"
+                                                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors {editModules[mod.id] 
+                                                                ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
+                                                                : 'bg-white hover:bg-white'}"
+                                                            onclick={() => {
+                                                                editModules[mod.id] = !editModules[mod.id];
+                                                                if (!editModules[mod.id]) selectedFileIds[mod.id] = new Set();
+                                                            }}
+                                                        >
+                                                            {#if editModules[mod.id]}
+                                                                <X class="w-4 h-4"/>
+                                                                Cancel
+                                                            {:else}
+                                                                <Pencil class="w-4 h-4"/>
+                                                                Edit
+                                                            {/if}
+                                                        </Button>
+                                                    {/if}
+                                                    <!-- Add Lesson Button -->
+                                                    <Dialog.Root>
+                                                        <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 hover:border-blue-300">
+                                                            <Plus class="w-4 h-4"/>
+                                                            Add Lesson
+                                                        </Dialog.Trigger>
 
-                                                    <Dialog.Content class="sm:max-w-[500px]">
-                                                        <Dialog.Header>
-                                                            <Dialog.Title class="text-xl font-semibold text-gray-900">Add New Lesson</Dialog.Title>
-                                                            <Dialog.Description class="text-gray-600">
-                                                                Upload a video lesson to this module. Supported formats: MP4, MOV, AVI
-                                                            </Dialog.Description>
-                                                        </Dialog.Header>
+                                                        <Dialog.Content class="sm:max-w-[500px]">
+                                                            <Dialog.Header>
+                                                                <Dialog.Title class="text-xl font-semibold text-gray-900">Add New Lesson</Dialog.Title>
+                                                                <Dialog.Description class="text-gray-600">
+                                                                    Upload a video lesson to this module. Supported formats: MP4, MOV, AVI
+                                                                </Dialog.Description>
+                                                            </Dialog.Header>
 
-                                                        <div class="space-y-6 py-4">
-                                                            <!-- File Upload Area -->
-                                                            <div class="space-y-2">
-                                                                <label for="" class="block text-sm font-medium text-gray-700">Video File</label>
-                                                                <div class="relative">
-                                                                    <input
-                                                                        type="file"
-                                                                        accept="video/*"
-                                                                        class="hidden"
-                                                                        id="video-upload-{mod.id}"
-                                                                        onchange={(e) => {
-                                                                            const target = e.target as HTMLInputElement | null;
-                                                                            selectedFile = target && target.files ? target.files[0] : null;
-                                                                            if (selectedFile) {
-                                                                                const video = document.createElement('video');
-                                                                                video.preload = 'metadata';
+                                                            <div class="space-y-6 py-4">
+                                                                <!-- File Upload Area -->
+                                                                <div class="space-y-2">
+                                                                    <label for="" class="block text-sm font-medium text-gray-700">Video File</label>
+                                                                    <div class="relative">
+                                                                        <input
+                                                                            type="file"
+                                                                            accept="video/*"
+                                                                            class="hidden"
+                                                                            id="video-upload-{mod.id}"
+                                                                            onchange={(e) => {
+                                                                                const target = e.target as HTMLInputElement | null;
+                                                                                selectedFile = target && target.files ? target.files[0] : null;
+                                                                                if (selectedFile) {
+                                                                                    const video = document.createElement('video');
+                                                                                    video.preload = 'metadata';
 
-                                                                                video.onloadedmetadata = () => {
-                                                                                    window.URL.revokeObjectURL(video.src);
-                                                                                    videoDuration = Math.round(video.duration);
-                                                                                    console.log('Duration (sec):', videoDuration);
-                                                                                };
+                                                                                    video.onloadedmetadata = () => {
+                                                                                        window.URL.revokeObjectURL(video.src);
+                                                                                        videoDuration = Math.round(video.duration);
+                                                                                        console.log('Duration (sec):', videoDuration);
+                                                                                    };
 
-                                                                                video.src = URL.createObjectURL(selectedFile);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <label
-                                                                        for="video-upload-{mod.id}"
-                                                                        class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
-                                                                    >
-                                                                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                                                            {#if selectedFile}
-                                                                                <div class="flex items-center gap-3 text-green-600">
-                                                                                    <Video class="w-8 h-8" />
-                                                                                    <div class="text-left">
-                                                                                        <p class="text-sm font-medium">{selectedFile.name}</p>
-                                                                                        <p class="text-xs text-gray-500">
-                                                                                            {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
-                                                                                            {#if videoDuration > 0}
-                                                                                                • {formatDuration(videoDuration)}
-                                                                                            {/if}
-                                                                                        </p>
+                                                                                    video.src = URL.createObjectURL(selectedFile);
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                        <label
+                                                                            for="video-upload-{mod.id}"
+                                                                            class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+                                                                        >
+                                                                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                                                {#if selectedFile}
+                                                                                    <div class="flex items-center gap-3 text-green-600">
+                                                                                        <Video class="w-8 h-8" />
+                                                                                        <div class="text-left">
+                                                                                            <p class="text-sm font-medium">{selectedFile.name}</p>
+                                                                                            <p class="text-xs text-gray-500">
+                                                                                                {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                                                                                                {#if videoDuration > 0}
+                                                                                                    • {formatDuration(videoDuration)}
+                                                                                                {/if}
+                                                                                            </p>
+                                                                                        </div>
                                                                                     </div>
-                                                                                </div>
-                                                                            {:else}
-                                                                                <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                                                </svg>
-                                                                                <p class="mb-2 text-sm text-gray-500">
-                                                                                    <span class="font-semibold">Click to upload</span> or drag and drop
-                                                                                </p>
-                                                                                <p class="text-xs text-gray-500">MP4, MOV, AVI (MAX. 500MB)</p>
-                                                                            {/if}
-                                                                        </div>
-                                                                    </label>
-                                                                </div>
-                                                            </div>
-
-                                                            <!-- Lesson Title -->
-                                                            <div class="space-y-2">
-                                                                <label for="" class="block text-sm font-medium text-gray-700">Lesson Title</label>
-                                                                <Input
-                                                                    bind:value={lessonTitle}
-                                                                    placeholder="Enter lesson title..."
-                                                                    class="w-full"
-                                                                />
-                                                            </div>
-
-                                                            <!-- Lesson Description -->
-                                                            <div class="space-y-2">
-                                                                <label for="" class="block text-sm font-medium text-gray-700">
-                                                                    Description
-                                                                    <span class="text-gray-500 font-normal">(Optional)</span>
-                                                                </label>
-                                                                <Textarea
-                                                                    bind:value={lessonDescription}
-                                                                    placeholder="Describe what students will learn in this lesson..."
-                                                                    rows={3}
-                                                                    class="w-full resize-none"
-                                                                />
-                                                            </div>
-
-                                                            <!-- Video Info Display -->
-                                                            {#if selectedFile && videoDuration > 0}
-                                                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                                                    <div class="flex items-center gap-3">
-                                                                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                                                            <Video class="w-5 h-5 text-blue-600" />
-                                                                        </div>
-                                                                        <div>
-                                                                            <p class="text-sm font-medium text-blue-900">Video Ready</p>
-                                                                            <p class="text-xs text-blue-700">
-                                                                                Duration: {formatDuration(videoDuration)} • Size: {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
-                                                                            </p>
-                                                                        </div>
+                                                                                {:else}
+                                                                                    <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                                    </svg>
+                                                                                    <p class="mb-2 text-sm text-gray-500">
+                                                                                        <span class="font-semibold">Click to upload</span> or drag and drop
+                                                                                    </p>
+                                                                                    <p class="text-xs text-gray-500">MP4, MOV, AVI (MAX. 500MB)</p>
+                                                                                {/if}
+                                                                            </div>
+                                                                        </label>
                                                                     </div>
                                                                 </div>
-                                                            {/if}
-                                                        </div>
 
-                                                        <Dialog.Footer class="flex gap-3 pt-6">
-                                                            <Dialog.Close>
-                                                                <Button variant="outline" class="flex-1" id={`lesson-dialog-${mod.id}`}>
-                                                                    Cancel
+                                                                <!-- Lesson Title -->
+                                                                <div class="space-y-2">
+                                                                    <label for="" class="block text-sm font-medium text-gray-700">Lesson Title</label>
+                                                                    <Input
+                                                                        bind:value={lessonTitle}
+                                                                        placeholder="Enter lesson title..."
+                                                                        class="w-full"
+                                                                    />
+                                                                </div>
+
+                                                                <!-- Lesson Description -->
+                                                                <div class="space-y-2">
+                                                                    <label for="" class="block text-sm font-medium text-gray-700">
+                                                                        Description
+                                                                        <span class="text-gray-500 font-normal">(Optional)</span>
+                                                                    </label>
+                                                                    <Textarea
+                                                                        bind:value={lessonDescription}
+                                                                        placeholder="Describe what students will learn in this lesson..."
+                                                                        rows={3}
+                                                                        class="w-full resize-none"
+                                                                    />
+                                                                </div>
+
+                                                                <!-- Video Info Display -->
+                                                                {#if selectedFile && videoDuration > 0}
+                                                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                                                        <div class="flex items-center gap-3">
+                                                                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                                                                <Video class="w-5 h-5 text-blue-600" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <p class="text-sm font-medium text-blue-900">Video Ready</p>
+                                                                                <p class="text-xs text-blue-700">
+                                                                                    Duration: {formatDuration(videoDuration)} • Size: {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                {/if}
+                                                            </div>
+
+                                                            <Dialog.Footer class="flex gap-3 pt-6">
+                                                                <Dialog.Close>
+                                                                    <Button variant="outline" class="flex-1" id={`lesson-dialog-${mod.id}`}>
+                                                                        Cancel
+                                                                    </Button>
+                                                                </Dialog.Close>
+                                                                <Button
+                                                                    onclick={() => handleLessonUpload(mod.id)}
+                                                                    disabled={!selectedFile || !lessonTitle.trim()}
+                                                                    class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                >
+                                                                    Upload Lesson
                                                                 </Button>
-                                                            </Dialog.Close>
-                                                            <Button
-                                                                onclick={() => handleLessonUpload(mod.id)}
-                                                                disabled={!selectedFile || !lessonTitle.trim()}
-                                                                class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                Upload Lesson
-                                                            </Button>
-                                                        </Dialog.Footer>
-                                                    </Dialog.Content>
-                                                </Dialog.Root>
-                                            </div>
+                                                            </Dialog.Footer>
+                                                        </Dialog.Content>
+                                                    </Dialog.Root>
+                                                </div>
+                                            {/if}
 
                                             {#if editModules[mod.id] && mod.lessons.length > 0}
                                                 <div class=" mb-4">
@@ -1206,123 +1213,125 @@
                             
                                 <Accordion.Content class="px-6 pb-4 bg-gray-50">
                                     <div class="space-y-3">
-                                        <!-- Action Buttons -->
-                                        <div class="flex gap-2 justify-end mb-4 pt-2">
-                                            {#if data.materials?.length > 0}
-                                                <!-- Edit Button -->
-                                                <Button
-                                                    variant="secondary"
-                                                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors 
-                                                    {editMaterials 
-                                                        ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
-                                                        : 'bg-white hover:bg-white'}"
-                                                    onclick={() => {
-                                                        editMaterials = !editMaterials;
-                                                        if (!editMaterials) selectedMaterialIds = new Set();
-                                                    }}
-                                                >
-                                                    {#if editMaterials}
-                                                        <X class="w-4 h-4" />
-                                                        Cancel
-                                                    {:else}
-                                                        <Pencil class="w-4 h-4" />
-                                                        Edit
-                                                    {/if}
-                                                </Button>
-                                            {/if}
-                            
-                                            <!-- Add Material Dialog -->
-                                            <Dialog.Root>
-                                                <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200 hover:border-green-300">
-                                                    <Plus class="w-4 h-4" />
-                                                    Add Material
-                                                </Dialog.Trigger>
-                            
-                                                <Dialog.Content class="sm:max-w-[500px] overflow-auto max-h-[80%]">
-                                                    <Dialog.Header>
-                                                        <Dialog.Title class="text-xl font-semibold text-gray-900">
-                                                            Upload Course Material
-                                                        </Dialog.Title>
-                                                        <Dialog.Description class="text-gray-600">
-                                                            Upload a PDF, ZIP, or image file for your course. Max 100 MB.
-                                                        </Dialog.Description>
-                                                    </Dialog.Header>
-                            
-                                                    <div class="space-y-6 py-4">
-                                                        <!-- File Upload -->
-                                                        <div class="space-y-2">
-                                                            <label for="" class="block text-sm font-medium text-gray-700">File</label>
-                                                            <div class="relative">
-                                                                <input
-                                                                    id="material-file-input"
-                                                                    type="file"
-                                                                    accept=".pdf,.zip,image/*"
-                                                                    class="hidden"
-                                                                    onchange={(e) => {
-                                                                        const file = e.currentTarget?.files?.[0];
-                                                                        if (!file) return;
-                                                                        selectedMaterialFile = file;
-                                                                        materialPreviewUrl = file.type.startsWith('image/')
-                                                                            ? URL.createObjectURL(file)
-                                                                            : '';
-                                                                    }}
-                                                                />
-                                                                <label
-                                                                    for="material-file-input"
-                                                                    class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
-                                                                >
-                                                                    {#if selectedMaterialFile}
-                                                                        <div class="flex items-center gap-3 text-green-600">
-                                                                            <FileText class="w-8 h-8" />
-                                                                            <div class="text-left">
-                                                                                <p class="text-sm font-medium">{selectedMaterialFile.name}</p>
-                                                                                <p class="text-xs text-gray-500">
-                                                                                    {formatFileSize(selectedMaterialFile.size)}
-                                                                                </p>
+                                        {#if isInstructor}
+                                            <!-- Action Buttons -->
+                                            <div class="flex gap-2 justify-end mb-4 pt-2">
+                                                {#if data.materials?.length > 0}
+                                                    <!-- Edit Button -->
+                                                    <Button
+                                                        variant="secondary"
+                                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors 
+                                                        {editMaterials 
+                                                            ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300' 
+                                                            : 'bg-white hover:bg-white'}"
+                                                        onclick={() => {
+                                                            editMaterials = !editMaterials;
+                                                            if (!editMaterials) selectedMaterialIds = new Set();
+                                                        }}
+                                                    >
+                                                        {#if editMaterials}
+                                                            <X class="w-4 h-4" />
+                                                            Cancel
+                                                        {:else}
+                                                            <Pencil class="w-4 h-4" />
+                                                            Edit
+                                                        {/if}
+                                                    </Button>
+                                                {/if}
+                                
+                                                <!-- Add Material Dialog -->
+                                                <Dialog.Root>
+                                                    <Dialog.Trigger class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200 hover:border-green-300">
+                                                        <Plus class="w-4 h-4" />
+                                                        Add Material
+                                                    </Dialog.Trigger>
+                                
+                                                    <Dialog.Content class="sm:max-w-[500px] overflow-auto max-h-[80%]">
+                                                        <Dialog.Header>
+                                                            <Dialog.Title class="text-xl font-semibold text-gray-900">
+                                                                Upload Course Material
+                                                            </Dialog.Title>
+                                                            <Dialog.Description class="text-gray-600">
+                                                                Upload a PDF, ZIP, or image file for your course. Max 100 MB.
+                                                            </Dialog.Description>
+                                                        </Dialog.Header>
+                                
+                                                        <div class="space-y-6 py-4">
+                                                            <!-- File Upload -->
+                                                            <div class="space-y-2">
+                                                                <label for="" class="block text-sm font-medium text-gray-700">File</label>
+                                                                <div class="relative">
+                                                                    <input
+                                                                        id="material-file-input"
+                                                                        type="file"
+                                                                        accept=".pdf,.zip,image/*"
+                                                                        class="hidden"
+                                                                        onchange={(e) => {
+                                                                            const file = e.currentTarget?.files?.[0];
+                                                                            if (!file) return;
+                                                                            selectedMaterialFile = file;
+                                                                            materialPreviewUrl = file.type.startsWith('image/')
+                                                                                ? URL.createObjectURL(file)
+                                                                                : '';
+                                                                        }}
+                                                                    />
+                                                                    <label
+                                                                        for="material-file-input"
+                                                                        class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+                                                                    >
+                                                                        {#if selectedMaterialFile}
+                                                                            <div class="flex items-center gap-3 text-green-600">
+                                                                                <FileText class="w-8 h-8" />
+                                                                                <div class="text-left">
+                                                                                    <p class="text-sm font-medium">{selectedMaterialFile.name}</p>
+                                                                                    <p class="text-xs text-gray-500">
+                                                                                        {formatFileSize(selectedMaterialFile.size)}
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    {:else}
-                                                                        <div class="flex flex-col items-center justify-center">
-                                                                            <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                                            </svg>
-                                                                            <p class="mb-2 text-sm text-gray-500">
-                                                                                <span class="font-semibold">Click to upload</span> or drag and drop
-                                                                            </p>
-                                                                            <p class="text-xs text-gray-500">PDF, ZIP, Images (MAX. 100MB)</p>
-                                                                        </div>
-                                                                    {/if}
-                                                                </label>
+                                                                        {:else}
+                                                                            <div class="flex flex-col items-center justify-center">
+                                                                                <svg class="w-8 h-8 mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                                </svg>
+                                                                                <p class="mb-2 text-sm text-gray-500">
+                                                                                    <span class="font-semibold">Click to upload</span> or drag and drop
+                                                                                </p>
+                                                                                <p class="text-xs text-gray-500">PDF, ZIP, Images (MAX. 100MB)</p>
+                                                                            </div>
+                                                                        {/if}
+                                                                    </label>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                            
-                                                    <!-- Image Preview -->
-                                                    {#if materialPreviewUrl}
-                                                        <div class="aspect-video w-full border rounded-lg bg-gray-100">
-                                                            <img src={materialPreviewUrl} alt="Preview" class="w-full h-full object-contain" />
-                                                        </div>
-                                                    {/if}
-                            
-                                                    <!-- Footer -->
-                                                    <Dialog.Footer class="flex gap-3 pt-6">
-                                                        <Dialog.Close>
-                                                            <Button variant="outline" class="flex-1" id="material-dialog-close">Cancel</Button>
-                                                        </Dialog.Close>
-                                                        <Button
-                                                            class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                                                            disabled={!selectedMaterialFile}
-                                                            onclick={() => {
-                                                                if (selectedMaterialFile) uploadMaterial(selectedMaterialFile);
-                                                            }}
-                                                        >
-                                                            Upload
-                                                        </Button>
-                                                    </Dialog.Footer>
-                                                </Dialog.Content>
-                                            </Dialog.Root>
-                                        </div>
+                                
+                                                        <!-- Image Preview -->
+                                                        {#if materialPreviewUrl}
+                                                            <div class="aspect-video w-full border rounded-lg bg-gray-100">
+                                                                <img src={materialPreviewUrl} alt="Preview" class="w-full h-full object-contain" />
+                                                            </div>
+                                                        {/if}
+                                
+                                                        <!-- Footer -->
+                                                        <Dialog.Footer class="flex gap-3 pt-6">
+                                                            <Dialog.Close>
+                                                                <Button variant="outline" class="flex-1" id="material-dialog-close">Cancel</Button>
+                                                            </Dialog.Close>
+                                                            <Button
+                                                                class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                                                                disabled={!selectedMaterialFile}
+                                                                onclick={() => {
+                                                                    if (selectedMaterialFile) uploadMaterial(selectedMaterialFile);
+                                                                }}
+                                                            >
+                                                                Upload
+                                                            </Button>
+                                                        </Dialog.Footer>
+                                                    </Dialog.Content>
+                                                </Dialog.Root>
+                                            </div>
+                                        {/if}
                             
                                         <!-- Bulk Select Controls (only shown when editing) -->
                                         {#if editMaterials && data.materials?.length > 0}

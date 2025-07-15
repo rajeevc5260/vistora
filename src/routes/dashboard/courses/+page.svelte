@@ -5,6 +5,12 @@
     import { Badge } from "$lib/components/ui/badge";
     import { CalendarDays, Plus, BookOpen, Check, Eye } from "lucide-svelte";
     import Input from "$lib/components/ui/input/input.svelte";
+    import type { PageProps } from "./$types";
+
+    let { data }: PageProps = $props();
+
+    const userRole = data.session?.user?.role || 'viewer';
+    const isInstructor = userRole === 'instructor';
 
     type Course = {
         id: string;
@@ -116,30 +122,36 @@
             searchCourses(value.trim());
         }, 300);
     }
-
-
 </script>
 
 <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">Your Courses</h1>
+            <h1 class="text-3xl font-bold text-gray-900">
+                {isInstructor ? 'Your Courses' : 'Explore Courses'}
+            </h1>
             <p class="text-gray-600 mt-1">
-                Manage and organize your educational content
-                {#if courses.length > 0}
-                    • {courses.length} course{courses.length !== 1 ? 's' : ''} total
+                {#if isInstructor}
+                    Manage and organize your educational content
+                    {#if courses.length > 0}
+                        • {courses.length} course{courses.length !== 1 ? 's' : ''} total
+                    {/if}
+                {:else}
+                    Browse the courses available to you
                 {/if}
             </p>
         </div>
         
-        <Button 
-            onclick={() => goto("/dashboard/courses/new")} 
-            class="gap-2  text-white px-6 py-3 rounded-lg shadow-sm"
-        >
-            <Plus class="w-5 h-5" />
-            Create New Course
-        </Button>
+        {#if isInstructor}
+            <Button 
+                onclick={() => goto("/dashboard/courses/new")} 
+                class="gap-2  text-white px-6 py-3 rounded-lg shadow-sm"
+            >
+                <Plus class="w-5 h-5" />
+                Create New Course
+            </Button>
+        {/if}
     </div>
 
     <div class="relative">

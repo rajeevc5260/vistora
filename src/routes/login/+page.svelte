@@ -51,6 +51,15 @@
                     /></svg
                 >
             </Button>
+
+            <Button
+                variant="secondary"
+                size="lg"
+                class="text-md px-6 py-4"
+                href="/login/instructor"
+            >
+            Sign in as Instructor
+            </Button>
         {/if}
         <a href="/" class="text-sm underline">Back to home</a>
     </div>

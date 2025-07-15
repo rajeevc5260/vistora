@@ -10,6 +10,7 @@
     } from "$lib/components/ui/avatar";
     import type { LayoutProps } from "./$types";
     import { page } from "$app/state";
+    import { logout } from "$lib/utils/logout";
 
     let { data, children }: LayoutProps = $props();
     const user = data.session?.user;
@@ -97,7 +98,7 @@
                 variant="outline"
                 size="sm"
                 class="w-full gap-2 justify-center"
-                onclick={signOut}
+                onclick={logout}
             >
                 <LogOut class="w-4 h-4" />
                 Sign Out
@@ -105,7 +106,7 @@
         </Sidebar.Footer>
     </Sidebar.Root>
 
-    <Sidebar.Trigger />
+    <Sidebar.Trigger  class="sticky top-0"/>
 
     <main class="flex-1 overflow-auto pl-2 pr-4 py-10">
         {@render children?.()}
