@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { db } from '$lib/server/db';
 import { courses } from '$lib/server/db/schema';
 import { trelae } from '$lib/utils/trelae';
-import { ilike } from 'drizzle-orm';
+import { and, ilike, eq } from 'drizzle-orm';
+import { getSessionFromCookie } from '$lib/auth/session';
 
 const searchSchema = z.object({
 	query: z.string().min(1),
@@ -11,7 +12,7 @@ const searchSchema = z.object({
 	offset: z.coerce.number().min(0).default(0)
 });
 
-export async function GET({ url }) {
+export async function GET({ url, cookies, locals }) {
 	const result = searchSchema.safeParse({
 		query: url.searchParams.get('query'),
 		limit: url.searchParams.get('limit'),
@@ -24,16 +25,48 @@ export async function GET({ url }) {
 
 	const { query, limit, offset } = result.data;
 
-	// Search courses by title (case-insensitive, partial match)
-	let matchedCourses = await db
-		.select()
-		.from(courses)
-		.where(ilike(courses.title, `%${query}%`))
-		.orderBy(courses.createdAt)
-		.limit(limit)
-		.offset(offset);
+	// --- Extract session ---
+	const authCookie = cookies.get('auth');
+	let session = null;
 
-	// Attach presigned thumbnail URLs
+	if (authCookie) {
+		const decoded = await getSessionFromCookie(authCookie);
+		if (decoded) session = { user: decoded };
+	}
+
+	if (!session && locals.auth) {
+		const googleSession = await locals.auth();
+		if (googleSession) session = googleSession;
+	}
+
+	const user = session?.user;
+	console.log("user", user);
+
+	// --- Search courses ---
+	let matchedCourses;
+
+	if (user?.role === 'instructor' && user?.id) {
+		matchedCourses = await db
+			.select()
+			.from(courses)
+			.where(and(
+				ilike(courses.title, `%${query}%`),
+				eq(courses.instructorId, user.id)
+			))
+			.orderBy(courses.createdAt)
+			.limit(limit)
+			.offset(offset);
+	} else {
+		matchedCourses = await db
+			.select()
+			.from(courses)
+			.where(ilike(courses.title, `%${query}%`))
+			.orderBy(courses.createdAt)
+			.limit(limit)
+			.offset(offset);
+	}
+
+	// --- Attach thumbnail URLs ---
 	matchedCourses = await Promise.all(
 		matchedCourses.map(async (course) => {
 			if (course.thumbnailFileId) {

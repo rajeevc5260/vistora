@@ -4,9 +4,23 @@ import { eq, desc, count, sql } from 'drizzle-orm';
 import { redirect } from '@sveltejs/kit';
 import { trelae } from '$lib/utils/trelae';
 import type { PageServerLoad } from './$types';
+import { getSessionFromCookie } from '$lib/auth/session';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	const session = await locals.auth();
+export const load: PageServerLoad = async ({ locals, cookies }) => {
+	const authCookie = cookies.get('auth');
+	let session = null;
+
+	if (authCookie) {
+		const decoded = await getSessionFromCookie(authCookie);
+		if (decoded) session = { user: decoded };
+	}
+
+	if (!session && locals.auth) {
+		const googleSession = await locals.auth();
+		if (googleSession) session = googleSession;
+	}
+
+	console.log("session", session)
 
 	if (!session?.user) {
 		throw redirect(302, '/auth/signin');

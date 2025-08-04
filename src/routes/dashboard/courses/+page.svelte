@@ -9,6 +9,8 @@
 
     let { data }: PageProps = $props();
 
+    $inspect(data);
+
     const userRole = data.session?.user?.role || 'viewer';
     const isInstructor = userRole === 'instructor';
 

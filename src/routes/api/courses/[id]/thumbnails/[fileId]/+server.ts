@@ -3,9 +3,22 @@ import { db } from '$lib/server/db';
 import { courseThumbnails } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { trelae } from '$lib/utils/trelae';
+import { getSessionFromCookie } from '$lib/auth/session';
 
-export async function DELETE({ params, locals }) {
-    const session = await locals.auth();
+export async function DELETE({ params, locals, cookies }) {
+    const authCookie = cookies.get('auth');
+	let session = null;
+
+	if (authCookie) {
+		const decoded = await getSessionFromCookie(authCookie);
+		if (decoded) session = { user: decoded };
+	}
+
+	if (!session && locals.auth) {
+		const googleSession = await locals.auth();
+		if (googleSession) session = googleSession;
+	}
+
     if (!session || !session.user) {
         return new Response('Unauthorized', { status: 401 });
     }

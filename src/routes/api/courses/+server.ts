@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { courses, courseThumbnails } from '$lib/server/db/schema';
 import { trelae } from '$lib/utils/trelae';
 import { randomUUID } from 'crypto';
+import { createSessionCookie, getSessionFromCookie } from '$lib/auth/session';
 
 const schema = z.object({
     title: z.string().min(1),
@@ -14,8 +15,19 @@ const schema = z.object({
         .optional()
 });
 
-export async function POST({ request, locals }) {
-    const session = await locals.auth();
+export async function POST({ request, locals, cookies }) {
+    const authCookie = cookies.get('auth');
+	let session = null;
+
+	if (authCookie) {
+		const decoded = await getSessionFromCookie(authCookie);
+		if (decoded) session = { user: decoded };
+	}
+
+	if (!session && locals.auth) {
+		const googleSession = await locals.auth();
+		if (googleSession) session = googleSession;
+	}
 
     console.log("Session:", session);
     console.log("Session user:", session?.user);
@@ -117,15 +129,45 @@ export async function POST({ request, locals }) {
 }
 
 
-export async function GET({ url }) {
+export async function GET({ url, locals, cookies }) {
 	const limit = parseInt(url.searchParams.get("limit") || "10");
 	const offset = parseInt(url.searchParams.get("offset") || "0");
 
-	let paginatedCourses = await db.query.courses.findMany({
-		offset,
-		limit,
-		orderBy: (c, { desc }) => [desc(c.createdAt)]
-	});
+	const authCookie = cookies.get('auth');
+	let session = null;
+
+	if (authCookie) {
+		const decoded = await getSessionFromCookie(authCookie);
+		if (decoded) session = { user: decoded };
+	}
+
+	if (!session && locals.auth) {
+		const googleSession = await locals.auth();
+		if (googleSession) session = googleSession;
+	}
+
+	const user = session?.user;
+
+    console.log("user", user)
+
+	let paginatedCourses;
+
+	if (user?.role === "instructor") {
+		if (!user.id) throw new Error("User ID is required for instructor course query.");
+
+		paginatedCourses = await db.query.courses.findMany({
+			where: (c, { eq }) => eq(c.instructorId, user.id as string),
+			offset,
+			limit,
+			orderBy: (c, { desc }) => [desc(c.createdAt)]
+		});
+	} else {
+		paginatedCourses = await db.query.courses.findMany({
+			offset,
+			limit,
+			orderBy: (c, { desc }) => [desc(c.createdAt)]
+		});
+	}
 
 	paginatedCourses = await Promise.all(
 		paginatedCourses.map(async (course) => {
@@ -144,3 +186,4 @@ export async function GET({ url }) {
 
 	return json(paginatedCourses);
 }
+

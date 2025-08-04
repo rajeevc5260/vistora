@@ -1,3 +1,4 @@
+import { getSessionFromCookie } from "$lib/auth/session";
 import { db } from "$lib/server/db";
 import { courses, modules, users, videos } from "$lib/server/db/schema";
 import { trelae } from "$lib/utils/trelae";
@@ -10,8 +11,20 @@ const schema = z.object({
   thumbnailFileId: z.string().url().optional(),
 });
 
-export async function PUT({ request, params, locals }) {
-  const session = await locals.auth();
+export async function PUT({ request, params, locals, cookies }) {
+  const authCookie = cookies.get('auth');
+	let session = null;
+
+	if (authCookie) {
+		const decoded = await getSessionFromCookie(authCookie);
+		if (decoded) session = { user: decoded };
+	}
+
+	if (!session && locals.auth) {
+		const googleSession = await locals.auth();
+		if (googleSession) session = googleSession;
+	}
+
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
 
   const body = await request.json();

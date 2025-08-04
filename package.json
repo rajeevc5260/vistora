@@ -55,7 +55,7 @@
 		"drizzle-orm": "^0.44.2",
 		"jose": "^6.0.11",
 		"tailwindcss": "^4.1.11",
-		"trelae-files": "^0.1.1",
+		"trelae-files": "^0.1.4",
 		"zod": "^3.25.75"
 	}
 }

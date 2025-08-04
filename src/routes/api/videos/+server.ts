@@ -1,12 +1,25 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { videos, modules, courses, courseThumbnails } from '$lib/server/db/schema';
-import { eq, desc, like, or, sql } from 'drizzle-orm';
+import { eq, desc, like, or, and } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { trelae } from '$lib/utils/trelae';
+import { getSessionFromCookie } from '$lib/auth/session';
 
-export const GET: RequestHandler = async ({ url, locals }) => {
-    const session = await locals.auth();
+export const GET: RequestHandler = async ({ url, locals, cookies }) => {
+    const authCookie = cookies.get('auth');
+    let session = null;
+
+    if (authCookie) {
+        const decoded = await getSessionFromCookie(authCookie);
+        if (decoded) session = { user: decoded };
+    }
+
+    if (!session && locals.auth) {
+        const googleSession = await locals.auth();
+        if (googleSession) session = googleSession;
+    }
+
 
     if (!session?.user) {
         return json({ error: 'Unauthorized' }, { status: 401 });
@@ -17,7 +30,20 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     const searchQuery = url.searchParams.get('query') || '';
 
     try {
-        // Base query
+        const filters = [
+            eq(courses.instructorId, session.user.id!)
+        ];
+
+        const search = searchQuery.trim()
+            ? or(
+                like(videos.title, `%${searchQuery}%`),
+                like(videos.description, `%${searchQuery}%`),
+                like(courses.title, `%${searchQuery}%`)
+            )
+            : null;
+
+        if (search) filters.push(search);
+
         let baseQuery = db
             .select({
                 id: videos.id,
@@ -37,26 +63,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
             .leftJoin(modules, eq(videos.moduleId, modules.id))
             .leftJoin(courses, eq(modules.courseId, courses.id))
             .leftJoin(courseThumbnails, eq(courses.id, courseThumbnails.courseId))
-            .where(
-                session.user.id
-                    ? eq(courses.instructorId, session.user.id)
-                    : sql`1=0`
-            )
+            .where(and(...filters))
             .orderBy(desc(videos.createdAt))
             .limit(limit)
             .offset(offset);
-
-        // Add search filter if present
-        if (searchQuery.trim()) {
-            // @ts-expect-error
-            baseQuery = baseQuery.where(
-                or(
-                    like(videos.title, `%${searchQuery}%`),
-                    like(videos.description, `%${searchQuery}%`),
-                    like(courses.title, `%${searchQuery}%`)
-                )
-            );
-        }
 
         const rawVideos = await baseQuery;
 
