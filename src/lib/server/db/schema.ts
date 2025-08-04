@@ -68,6 +68,43 @@ export const courseMaterials = pgTable("course_materials", {
 	createdAt: timestamp("created_at").defaultNow(),
 });
 
+
+// Enrollments
+export const courseEnrollments = pgTable( "course_enrollments", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    courseId: uuid("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+    enrolledAt: timestamp("enrolled_at").defaultNow(),
+    completed: boolean("completed").default(false),
+  },
+  (table) => [
+    uniqueIndex("unique_user_course").on(table.userId, table.courseId),
+  ]
+);
+
+
+// Video Progress
+export const videoProgress = pgTable( "video_progress", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    videoId: uuid("video_id").notNull().references(() => videos.id, { onDelete: "cascade" }),
+    watchedSeconds: integer("watched_seconds").default(0),
+    lastWatchedAt: timestamp("last_watched_at").defaultNow(),
+    completed: boolean("completed").default(false),
+  },
+  (table) => [
+    uniqueIndex("unique_user_video").on(table.userId, table.videoId),
+  ]
+);
+
+export const favorites = pgTable('favorites', {
+	userId: text('user_id').notNull(),
+	courseId: text('course_id').notNull(),
+	createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+	uniqueIndex("unique_favorite").on(table.userId, table.courseId)
+]);
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -79,4 +116,10 @@ export type Video = typeof videos.$inferSelect;
 export type NewVideo = typeof videos.$inferInsert;
 export type CourseMaterial = typeof courseMaterials.$inferSelect;
 export type NewCourseMaterial = typeof courseMaterials.$inferInsert;
+export type CourseEnrollment = typeof courseEnrollments.$inferSelect;
+export type NewCourseEnrollment = typeof courseEnrollments.$inferInsert;
+export type VideoProgress = typeof videoProgress.$inferSelect;
+export type NewVideoProgress = typeof videoProgress.$inferInsert;
+export type Favorite = typeof favorites.$inferSelect;
+export type NewFavorite = typeof favorites.$inferInsert;
 

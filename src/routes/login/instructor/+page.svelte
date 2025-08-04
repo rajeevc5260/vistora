@@ -163,7 +163,7 @@
                 <!-- Divider -->
                 <div class="relative">
                     <div class="absolute inset-0 flex items-center">
-                        <span class="w-full border-t border-gray-200" />
+                        <span class="w-full border-t border-gray-200" ></span>
                     </div>
                     <div class="relative flex justify-center text-xs uppercase">
                         <span class="bg-white px-2 text-gray-500">or</span>

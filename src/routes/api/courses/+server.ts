@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { db } from '$lib/server/db';
-import { courses, courseThumbnails } from '$lib/server/db/schema';
+import { courses, courseThumbnails, courseEnrollments } from '$lib/server/db/schema';
 import { trelae } from '$lib/utils/trelae';
 import { randomUUID } from 'crypto';
 import { createSessionCookie, getSessionFromCookie } from '$lib/auth/session';
@@ -17,17 +17,17 @@ const schema = z.object({
 
 export async function POST({ request, locals, cookies }) {
     const authCookie = cookies.get('auth');
-	let session = null;
+    let session = null;
 
-	if (authCookie) {
-		const decoded = await getSessionFromCookie(authCookie);
-		if (decoded) session = { user: decoded };
-	}
+    if (authCookie) {
+        const decoded = await getSessionFromCookie(authCookie);
+        if (decoded) session = { user: decoded };
+    }
 
-	if (!session && locals.auth) {
-		const googleSession = await locals.auth();
-		if (googleSession) session = googleSession;
-	}
+    if (!session && locals.auth) {
+        const googleSession = await locals.auth();
+        if (googleSession) session = googleSession;
+    }
 
     console.log("Session:", session);
     console.log("Session user:", session?.user);
@@ -89,18 +89,18 @@ export async function POST({ request, locals, cookies }) {
                 location: `thumbnail`
             });
 
-            console.log('Upload request:', uploadRequest);
+        console.log('Upload request:', uploadRequest);
 
-            await fetch(uploadRequest.uploadUrl, {
-                method: "PUT",
-                body: buffer,
-                headers: {
-                    "Content-Type": contentType
-                }
-            });
+        await fetch(uploadRequest.uploadUrl, {
+            method: "PUT",
+            body: buffer,
+            headers: {
+                "Content-Type": contentType
+            }
+        });
 
-            thumbnailFileId = uploadRequest.id;
-            console.log('Thumbnail uploaded:', thumbnailFileId);
+        thumbnailFileId = uploadRequest.id;
+        console.log('Thumbnail uploaded:', thumbnailFileId);
     }
 
     const [course] = await db
@@ -115,15 +115,15 @@ export async function POST({ request, locals, cookies }) {
         })
         .returning({ id: courses.id });
 
-        // insert thumbnail record if uploaded
-        if (thumbnailFileId) {
-            await db.insert(courseThumbnails).values({
-                name:`${namespaceName}-thumbnail.png`,
-                courseId: course.id,
-                fileId: thumbnailFileId,
-                location: 'thumbnail',
-            });
-        }
+    // insert thumbnail record if uploaded
+    if (thumbnailFileId) {
+        await db.insert(courseThumbnails).values({
+            name: `${namespaceName}-thumbnail.png`,
+            courseId: course.id,
+            fileId: thumbnailFileId,
+            location: 'thumbnail',
+        });
+    }
 
     return json({ id: course.id });
 }
@@ -148,20 +148,16 @@ export async function GET({ url, locals, cookies }) {
 
 	const user = session?.user;
 
-    console.log("user", user)
-
 	let paginatedCourses;
 
-	if (user?.role === "instructor") {
-		if (!user.id) throw new Error("User ID is required for instructor course query.");
-
-		paginatedCourses = await db.query.courses.findMany({
-			where: (c, { eq }) => eq(c.instructorId, user.id as string),
-			offset,
-			limit,
-			orderBy: (c, { desc }) => [desc(c.createdAt)]
-		});
-	} else {
+	if (user?.role === "instructor" && user?.id) {
+        paginatedCourses = await db.query.courses.findMany({
+          where: (c, { eq }) => eq(c.instructorId, user.id!), // <-- non-null assertion
+          offset,
+          limit,
+          orderBy: (c, { desc }) => [desc(c.createdAt)]
+        });
+    } else {
 		paginatedCourses = await db.query.courses.findMany({
 			offset,
 			limit,
@@ -169,18 +165,40 @@ export async function GET({ url, locals, cookies }) {
 		});
 	}
 
+	const favoriteSet = new Set<string>();
+	if (user?.id) {
+		const favoritesList = await db.query.favorites.findMany({
+			where: (f, { eq }) => eq(f.userId, user.id!),
+			columns: { courseId: true }
+		});
+		favoritesList.forEach((f) => favoriteSet.add(f.courseId));
+	}
+
 	paginatedCourses = await Promise.all(
 		paginatedCourses.map(async (course) => {
+			let thumbnailUrl: string | undefined = undefined;
+			let isEnrolled = false;
+
 			if (course.thumbnailFileId) {
 				try {
 					const file = trelae.file(course.thumbnailFileId);
-					const url = await file.getDownloadUrl({ expire: 600 });
-					return { ...course, thumbnailUrl: url };
+					thumbnailUrl = await file.getDownloadUrl({ expire: 600 });
 				} catch (err) {
 					console.warn(`Thumbnail fetch failed for course ${course.id}`, err);
 				}
 			}
-			return course;
+
+			if (user?.role === 'viewer' && user?.id) {
+				const enrolled = await db.query.courseEnrollments.findFirst({
+					where: (e, { and, eq }) =>
+						and(eq(e.courseId, course.id), eq(e.userId, user.id!)),
+				});
+				isEnrolled = !!enrolled;
+			}
+
+			const isFavorited = user?.id ? favoriteSet.has(course.id) : false;
+
+			return { ...course, thumbnailUrl, isEnrolled, isFavorited };
 		})
 	);
 

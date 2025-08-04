@@ -19,12 +19,12 @@
 <Sidebar.Provider>
     <Sidebar.Root>
         <Sidebar.Header>
-            <div class="flex items-center gap-3 ml-2">
-                <div class="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg flex items-center justify-center shadow-lg">
-                    <span class="text-white font-bold text-sm">V</span>
+            <div class="flex items-center ml-2">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center">
+                    <img alt="Vistora logo" src="favicon.png" class="text-white font-bold text-sm" />
                 </div>
                 <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                    Vistora
+                    istora
                 </h1>
             </div>
         </Sidebar.Header>
@@ -69,16 +69,62 @@
                         <BookOpenText size={16}/>
                         Courses
                     </a>
-                    <a
-                        href="/dashboard/videos"
-                        class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
-                        class:bg-gray-100={page.url.pathname.startsWith(
-                            "/dashboard/videos",
-                        )}
-                    >
-                        <ListVideo size={16}/>
-                        Videos
-                    </a>
+                    {#if user?.role === 'instructor'}
+                        <a
+                            href="/dashboard/videos"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith(
+                                "/dashboard/videos",
+                            )}
+                        >
+                            <ListVideo size={16}/>
+                            Videos
+                        </a>
+                    {/if}
+                
+                    {#if user?.role === 'viewer'}
+                        <a
+                            href="/dashboard/progress"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/progress")}
+                        >
+                            <LayoutDashboard size={16}/>
+                            Learning Progress
+                        </a>
+                        <a
+                            href="/dashboard/favorites"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/favorites")}
+                        >
+                            <BookOpenText size={16}/>
+                            Favorites
+                        </a>
+                        <a
+                            href="/dashboard/certificates"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/certificates")}
+                        >
+                            <ListVideo size={16}/>
+                            Certificates
+                        </a>
+                        <a
+                            href="/dashboard/history"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/history")}
+                        >
+                            <BookOpenText size={16}/>
+                            Learning History
+                        </a>
+                        <a
+                            href="/dashboard/achievements"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/achievements")}
+                        >
+                            <LayoutDashboard size={16}/>
+                            Achievements
+                        </a>
+                    {/if}
+
                     <a
                         href="/dashboard/settings"
                         class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"

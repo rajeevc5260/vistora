@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { db } from '$lib/server/db';
-import { courses } from '$lib/server/db/schema';
+import { courses, courseEnrollments, favorites } from '$lib/server/db/schema';
 import { trelae } from '$lib/utils/trelae';
 import { and, ilike, eq } from 'drizzle-orm';
 import { getSessionFromCookie } from '$lib/auth/session';
@@ -25,7 +25,7 @@ export async function GET({ url, cookies, locals }) {
 
 	const { query, limit, offset } = result.data;
 
-	// --- Extract session ---
+	// --- Session extraction ---
 	const authCookie = cookies.get('auth');
 	let session = null;
 
@@ -40,9 +40,8 @@ export async function GET({ url, cookies, locals }) {
 	}
 
 	const user = session?.user;
-	console.log("user", user);
 
-	// --- Search courses ---
+	// --- Search logic ---
 	let matchedCourses;
 
 	if (user?.role === 'instructor' && user?.id) {
@@ -66,21 +65,40 @@ export async function GET({ url, cookies, locals }) {
 			.offset(offset);
 	}
 
-	// --- Attach thumbnail URLs ---
-	matchedCourses = await Promise.all(
+	// --- Enhance with isEnrolled, isFavorite and thumbnails ---
+	const enhancedCourses = await Promise.all(
 		matchedCourses.map(async (course) => {
+			let thumbnailUrl: string | undefined;
+			let isEnrolled = false;
+			let isFavorite = false;
+
 			if (course.thumbnailFileId) {
 				try {
 					const file = trelae.file(course.thumbnailFileId);
-					const url = await file.getDownloadUrl({ expire: 600 });
-					return { ...course, thumbnailUrl: url };
+					thumbnailUrl = await file.getDownloadUrl({ expire: 600 });
 				} catch (err) {
 					console.warn(`Thumbnail fetch failed for course ${course.id}`, err);
 				}
 			}
-			return course;
+
+			if (user?.role === 'viewer' && user?.id) {
+				const [enrolled, favorite] = await Promise.all([
+					db.query.courseEnrollments.findFirst({
+						where: (e, { eq, and }) =>
+							and(eq(e.courseId, course.id), eq(e.userId, user.id!))
+					}),
+					db.query.favorites.findFirst({
+						where: (f, { eq, and }) =>
+							and(eq(f.courseId, course.id), eq(f.userId, user.id!))
+					})
+				]);
+				isEnrolled = !!enrolled;
+				isFavorite = !!favorite;
+			}
+
+			return { ...course, thumbnailUrl, isEnrolled, isFavorite };
 		})
 	);
 
-	return json(matchedCourses);
+	return json(enhancedCourses);
 }

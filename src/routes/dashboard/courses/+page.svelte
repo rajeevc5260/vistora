@@ -3,7 +3,7 @@
     import { Button } from "$lib/components/ui/button";
     import { goto } from "$app/navigation";
     import { Badge } from "$lib/components/ui/badge";
-    import { CalendarDays, Plus, BookOpen, Check, Eye } from "lucide-svelte";
+    import { CalendarDays, Plus, BookOpen, Check, Eye, Heart } from "lucide-svelte";
     import Input from "$lib/components/ui/input/input.svelte";
     import type { PageProps } from "./$types";
 
@@ -20,6 +20,8 @@
         description?: string;
         thumbnailUrl?: string;
         createdAt: string;
+        isEnrolled?: boolean;
+        isFavorited?:boolean;
     };
 
     let courses = $state<Course[]>([]);
@@ -124,6 +126,61 @@
             searchCourses(value.trim());
         }, 300);
     }
+
+    let enrollLoading = $state<{ [courseId: string]: boolean }>({});
+
+    async function enrollInCourse(courseId: string) {
+        enrollLoading[courseId] = true;
+        try {
+            const res = await fetch(`/api/courses/enroll`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ courseId })
+            });
+
+            if (res.ok) {
+                courses = courses.map((c) =>
+                    c.id === courseId ? { ...c, isEnrolled: true } : c
+                );
+            } else {
+                console.error("Enrollment failed");
+            }
+        } catch (err) {
+            console.error("Enrollment error", err);
+        } finally {
+            enrollLoading[courseId] = false;
+        }
+    }
+
+
+    let favoriteLoading = $state<{ [id: string]: boolean }>({});
+
+    async function toggleFavorite(courseId: string, current: boolean) {
+        favoriteLoading[courseId] = true;
+
+        try {
+            const res = await fetch(`/api/courses/favorite`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    courseId,
+                    action: current ? 'unfavorite' : 'favorite'
+                })
+            });
+
+            if (res.ok) {
+                courses = courses.map((c) =>
+                    c.id === courseId ? { ...c, isFavorited: !current } : c
+                );
+            } else {
+                console.error("Favorite toggle failed");
+            }
+        } finally {
+            favoriteLoading[courseId] = false;
+        }
+    }
 </script>
 
 <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
@@ -216,8 +273,9 @@
 
                     <!-- Content -->
                     <div class="p-6">
+                        
                         <div class="flex items-start justify-between gap-3 mb-3">
-                            <h3 class="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
+                            <h3 class="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-1">
                                 {course.title}
                             </h3>
                         </div>
@@ -226,6 +284,49 @@
                             {course.description || "No description provided for this course yet."}
                         </p>
 
+                        <div class="flex justify-center items-center gap-3 mb-2">
+                            <div class="flex-1">
+                                {#if !isInstructor && !course.isEnrolled}
+                                    <Button
+                                        size="sm"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white h-9 w-full text-sm"
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            enrollInCourse(course.id);
+                                        }}
+                                        disabled={enrollLoading[course.id]}
+                                    >
+                                        {#if enrollLoading[course.id]}
+                                            <span class="inline-flex items-center gap-2">
+                                                <div class="w-3 h-3 border-2 border-white border-t-blue-100 rounded-full animate-spin"></div>
+                                                Enrolling...
+                                            </span>
+                                        {:else}
+                                            Enroll
+                                        {/if}
+                                    </Button>
+                                {:else if !isInstructor && course.isEnrolled}
+                                    <div class="h-9 text-sm flex items-center justify-center bg-green-100 text-green-800 border border-green-300 rounded-md w-full">
+                                        Enrolled
+                                    </div>
+                                {/if}
+                            </div>
+                        
+                            <button
+                                class="bg-white/80 hover:bg-white/90 rounded-full p-1"
+                                onclick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFavorite(course?.id, course.isFavorited ?? false);
+                                }}
+                                disabled={favoriteLoading[course.id]}
+                            >
+                            {#if course.isFavorited}
+                                <Heart size={24} class="text-red-500 fill-red-500 stroke-none" />
+                            {:else}
+                                <Heart size={24} class="text-gray-500 fill-none stroke-2" />
+                            {/if}
+                            </button>
+                        </div>
                         <!-- Footer -->
                         <div class="flex items-center justify-between pt-4 border-t border-gray-100">
                             <div class="flex items-center gap-2 text-sm text-gray-500">
