@@ -150,37 +150,56 @@
     <!-- About Section -->
     <section id="about" class="bg-gradient-to-r from-gray-50 to-blue-50 py-24">
         <div class="max-w-6xl mx-auto px-6">
-            <div class="rounded-3xl border border-white/20 bg-white/80 backdrop-blur-sm p-12 shadow-xl">
-                <div class="text-center">
-                    <h2 class="text-4xl font-bold text-gray-900 mb-6">
-                        Built for modern educators
-                    </h2>
-                    <p class="text-xl text-gray-700 leading-relaxed max-w-4xl mx-auto">
-                        Whether you're teaching a course or sharing internal training
-                        content, Vistora helps you deliver engaging video experiences with
-                        powerful tools like role management, progress tracking, and secure
-                        content delivery.
-                    </p>
-                </div>
-                
-                <!-- Stats or additional info -->
-                <div class="grid md:grid-cols-3 gap-8 mt-12">
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">99.9%</div>
-                        <div class="text-gray-600">Uptime</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">50k+</div>
-                        <div class="text-gray-600">Videos Delivered</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">1K</div>
-                        <div class="text-gray-600">Students Reached</div>
-                    </div>
-                </div>
+          <div class="rounded-3xl border border-white/20 bg-white/80 backdrop-blur-sm p-12 shadow-xl">
+            <div class="text-center">
+              <h2 class="text-4xl font-bold text-gray-900 mb-6">
+                Built for modern educators
+              </h2>
+              <p class="text-xl text-gray-700 leading-relaxed max-w-4xl mx-auto">
+                Vistora is a new platform designed to help educators, trainers, and creators share
+                knowledge through streamlined video-first courses. Whether you're building a public course
+                or organizing internal training — Vistora gives you the tools to publish, manage, and engage learners effortlessly.
+              </p>
             </div>
+      
+            <!-- Highlights -->
+            <div class="grid md:grid-cols-3 gap-8 mt-12">
+              <div class="text-center">
+                <div class="text-blue-600 mb-2">
+                  <svg class="mx-auto w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M12 14l9-5-9-5-9 5 9 5z" />
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M12 14l6.16-3.422A12.042 12.042 0 0112 21a12.042 12.042 0 01-6.16-10.422L12 14z" />
+                  </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">Video-Centric</h3>
+                <p class="text-sm text-gray-600 mt-1">Built from the ground up for video-based education and training.</p>
+              </div>
+              <div class="text-center">
+                <div class="text-blue-600 mb-2">
+                  <svg class="mx-auto w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9.75 3v1.5m4.5-1.5v1.5m-6 16.5h7.5A2.25 2.25 0 0018 18.75V6.75A2.25 2.25 0 0015.75 4.5H8.25A2.25 2.25 0 006 6.75v12A2.25 2.25 0 008.25 21z" />
+                  </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">Modern UI</h3>
+                <p class="text-sm text-gray-600 mt-1">Clean, responsive design that works seamlessly across devices.</p>
+              </div>
+              <div class="text-center">
+                <div class="text-blue-600 mb-2">
+                  <svg class="mx-auto w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M15.75 9V5.25a2.25 2.25 0 00-4.5 0V9M12 12v7.5m0-7.5H9m3 0h3" />
+                  </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900">Launch Early</h3>
+                <p class="text-sm text-gray-600 mt-1">We’re currently onboarding early creators — get started today.</p>
+              </div>
+            </div>
+          </div>
         </div>
-    </section>
+      </section>
 
     <!-- CTA Section -->
     <section class="max-w-7xl mx-auto px-6 py-24 text-center">
