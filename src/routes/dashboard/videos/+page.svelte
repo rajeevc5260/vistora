@@ -3,21 +3,33 @@
     import { Button } from "$lib/components/ui/button";
     import { Badge } from "$lib/components/ui/badge";
     import { goto } from "$app/navigation";
-    import { 
-        Video, 
-        Plus, 
-        Search, 
-        Play, 
-        Clock, 
-        FolderOpen, 
+    import {
+        Video,
+        Plus,
+        Search,
+        Play,
+        Clock,
+        FolderOpen,
         BookOpen,
         Calendar,
         Filter,
         Eye,
-        MoreVertical
+        MoreVertical,
+        Trash
     } from "lucide-svelte";
     import Input from "$lib/components/ui/input/input.svelte";
     import type { PageProps } from "./$types";
+
+    import {
+        AlertDialog,
+        AlertDialogTrigger,
+        AlertDialogContent,
+        AlertDialogHeader,
+        AlertDialogTitle,
+        AlertDialogFooter,
+        AlertDialogCancel,
+        AlertDialogAction
+    } from "$lib/components/ui/alert-dialog";
 
     let { data }: PageProps = $props();
 
@@ -46,9 +58,47 @@
     let isSearching = $state(false);
     let searchOffset = $state(0);
     let searchEndReached = $state(false);
+    let deleteLoading = $state(false);
 
     const limit = 20;
     const searchLimit = 20;
+
+    let showDeleteDialog = $state(false);
+    let videoToDelete: VideoWithDetails | null = $state(null);
+
+    async function confirmDeleteVideo(video: VideoWithDetails) {
+        videoToDelete = video;
+        showDeleteDialog = true;
+    }
+
+    async function deleteVideo() {
+        if (!videoToDelete?.moduleId || !videoToDelete?.fileId) {
+            showDeleteDialog = false;
+            return;
+        }
+
+        deleteLoading = true;
+        try {
+            const res = await fetch(`/api/modules/${videoToDelete.moduleId}/lessons/bulk-delete`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ fileIds: [videoToDelete.fileId] })
+            });
+
+            if (res.ok) {
+                videos = videos.filter(v => v.fileId !== videoToDelete?.fileId);
+            } else {
+                console.error("Delete failed");
+            }
+        } catch (err) {
+            console.error("Delete error:", err);
+        } finally {
+            showDeleteDialog = false;
+            deleteLoading = false;
+        }
+    }
 
     async function loadMoreVideos() {
         if (loading || endReached || isSearching) return;
@@ -124,10 +174,7 @@
 
     function handleScroll() {
         const bottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 200;
-
-        if (bottom && !isSearching) {
-            loadMoreVideos();
-        }
+        if (bottom && !isSearching) loadMoreVideos();
     }
 
     onMount(() => {
@@ -150,15 +197,13 @@
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = seconds % 60;
 
-        if (hours > 0) {
-            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        return hours > 0
+            ? `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+            : `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
 
     function getResolutionBadges(resolutions?: string): string[] {
-        if (!resolutions) return [];
-        return resolutions.split(',').map(r => r.trim());
+        return resolutions?.split(',').map(r => r.trim()) || [];
     }
 </script>
 
@@ -221,7 +266,13 @@
             {#each videos as video}
                 <div class="group rounded-2xl border border-gray-200 bg-white hover:shadow-xl hover:border-blue-200 transition-all duration-300 overflow-hidden">
                     <!-- Video Thumbnail -->
-                    <div class="relative aspect-video overflow-hidden bg-gray-100">
+                    <div role="presentation" class="relative aspect-video overflow-hidden bg-gray-100 cursor-pointer" 
+                        onclick={(e) => {
+                            e.stopPropagation();
+                            if (video.courseId) {
+                                goto(`/dashboard/courses/${video.courseId}`);
+                            }
+                        }}>
                         {#if video.thumbnailUrl}
                             <img
                                 src={video.thumbnailUrl}
@@ -268,9 +319,6 @@
                             <h3 class="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
                                 {video.title}
                             </h3>
-                            <Button variant="ghost" size="sm" class="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MoreVertical class="w-4 h-4" />
-                            </Button>
                         </div>
 
                         {#if video.description}
@@ -299,13 +347,35 @@
                         <div class="flex items-center justify-between pt-4 border-t border-gray-100">
                             <div class="flex items-center gap-2 text-sm text-gray-500">
                                 <Calendar class="w-4 h-4" />
-                                <span>{formatDate(video.createdAt)}</span>
+                                <span class="line-clamp-1">{formatDate(video.createdAt)}</span>
                             </div>
                             
                             <div class="flex items-center gap-2">
-                                <Button variant="ghost" size="sm" class="gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="gap-1"
+                                    onclick={(e) => {
+                                        e.stopPropagation();
+                                        if (video.courseId) {
+                                            goto(`/dashboard/courses/${video.courseId}`);
+                                        }
+                                    }}
+                                >
                                     <Eye class="w-4 h-4" />
                                     <span class="text-xs">View</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="gap-1 text-red-600 hover:text-red-700"
+                                    onclick={(e) => {
+                                        e.stopPropagation();
+                                        confirmDeleteVideo(video);
+                                    }}
+                                >
+                                    <Trash class="w-4 h-4" />
+                                    <span class="text-xs">Delete</span>
                                 </Button>
                             </div>
                         </div>
@@ -313,6 +383,35 @@
                 </div>
             {/each}
         </div>
+    {/if}
+
+    <!-- Alert Dialog -->
+    {#if showDeleteDialog && videoToDelete}
+        <AlertDialog open onOpenChange={(open) => (showDeleteDialog = open)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>
+                        Are you sure you want to delete "<b>{videoToDelete.title}</b>"?
+                    </AlertDialogTitle>
+                </AlertDialogHeader>
+
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        class="bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2"
+                        onclick={deleteVideo}
+                        disabled={deleteLoading}
+                    >
+                        {#if deleteLoading}
+                            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Deleting...
+                        {:else}
+                            Delete
+                        {/if}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     {/if}
 
     <!-- Load More for Search Results -->

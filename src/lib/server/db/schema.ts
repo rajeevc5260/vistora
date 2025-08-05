@@ -10,6 +10,10 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   role: text("role").default("viewer"), // 'admin', 'instructor', 'viewer'
   passwordHash: text("password_hash"),
+  bio: text("bio"),
+  website: text("website"),
+  phone: text("phone"),
+  location: text("location"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

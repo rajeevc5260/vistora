@@ -29,7 +29,10 @@
         Download,
         Archive,
         File as FileIcon, 
-        FileImage
+        FileImage,
+
+        Repeat1
+
     } from "lucide-svelte";
     import { formatDuration, formatTotalDuration } from "$lib/utils/formatTime";
     import { loadVideoFromFirstLesson } from "$lib/utils/loadFirstVideo";
@@ -39,6 +42,12 @@
 
     let { data }: PageProps = $props();
     let { course, modules } = data;
+
+    let progressMap: Record<string, { watchedSeconds: number; completed: boolean }> = data.progressMap || {};
+
+    let removeProgressListener: (() => void) | null = null;
+    let currentVideoDuration: number = $state(0);
+
 
     const userRole = data.session?.user?.role || 'viewer';
     const isInstructor = userRole === 'instructor';
@@ -121,6 +130,15 @@
     let lessonDescription = $state('');
     let videoDuration = $state(0);
 
+    let isUploading = $state(false);
+
+    function preventUnload(e: BeforeUnloadEvent) {
+        if (isUploading) {
+            e.preventDefault();
+            e.returnValue = ''; // Required for Chrome and others
+        }
+    }
+
 	async function handleLessonUpload(moduleId: string) {
         if (!selectedFile || !lessonTitle) return;
 
@@ -128,6 +146,9 @@
 
         const dialogElement = document.querySelector(`#lesson-dialog-${moduleId}`) as HTMLElement;
         if (dialogElement) dialogElement.click();
+
+        isUploading = true;
+        window.addEventListener("beforeunload", preventUnload);
 
         try {
             const res = await fetch(`/api/modules/${moduleId}/lessons`, {
@@ -200,6 +221,9 @@
         } catch (err) {
             console.error(err);
             toast.error("Failed to upload lesson", { id: toastId });
+        } finally {
+            isUploading = false;
+            window.removeEventListener("beforeunload", preventUnload);
         }
     }
 
@@ -213,12 +237,15 @@
     let videoElement: HTMLVideoElement | null = $state(null);
     let videoPaused: boolean = $state(false);
 
+    let currentVideoId: string | null = $state(null);
+
     // Enhanced handleLessonClick function
-    async function handleLessonClick(fileId: string) {
+    async function handleLessonClick(fileId: string, videoId: string) {
         loadingFileId = fileId;
         selectedVideoUrl = null;
         currentPlayingVideoId = null;
         videoPaused = false;
+        currentVideoId = videoId;
         
         try {
             const res = await fetch(`/api/videos/${fileId}/download-url`);
@@ -232,6 +259,16 @@
                 if (video) {
                     videoElement = video;
                     setupVideoListeners();
+
+                     // ⏪ Seek to last watched time
+                     const progress = progressMap?.[fileId];
+                    const resumeTime = typeof progress === 'number'
+                        ? progress
+                        : typeof progress === 'object' && progress !== null && typeof progress.watchedSeconds === 'number'
+                            ? progress.watchedSeconds
+                            : 0;
+                    video.currentTime = resumeTime;
+
                     video.play();
                     videoPaused = false;
                 }
@@ -274,12 +311,75 @@
             videoElement.addEventListener('ended', handleVideoEnd);
             videoElement.addEventListener('loadstart', handleVideoLoadStart);
             videoElement.addEventListener('canplay', handleVideoCanPlay);
+
+            // Update current video duration
+            videoElement.addEventListener('loadedmetadata', () => {
+                currentVideoDuration = Math.floor(videoElement?.duration ?? 0);
+            });
+
+            // Attach progress tracker
+            if (removeProgressListener) removeProgressListener();
+            removeProgressListener = trackVideoProgress(videoElement, currentVideoId!);
         }
     }
+
+    function trackVideoProgress(videoElement: HTMLVideoElement, videoId: string) {
+        let lastSentWatched = -1;
+
+        const handler = () => {
+            if (!videoElement || !videoId) return;
+
+            const current = Math.floor(videoElement.currentTime);
+            const duration = Math.floor(videoElement.duration);
+
+            // Throttle updates every 60 seconds, skip if same as last
+            if (current !== lastSentWatched && current % 60 === 0) {
+                lastSentWatched = current;
+
+                const completed = current >= duration - 3;
+
+                console.log("Progress:", { current, duration, completed });
+
+                fetch('/api/video-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        videoId,
+                        watchedSeconds: current,
+                        completed
+                    })
+                }).catch((err) => {
+                    console.error("Failed to update video progress:", err);
+                });
+            }
+        };
+
+        videoElement.addEventListener('timeupdate', handler);
+
+        // Return a cleanup function in case you want to remove it later
+        return () => {
+            videoElement.removeEventListener('timeupdate', handler);
+        };
+    }
+
 
     // Event handler functions
     function handleVideoPause() {
         videoPaused = true;
+
+        if (videoElement && currentVideoId) {
+		const watched = Math.floor(videoElement.currentTime);
+
+		fetch('/api/video-progress', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				videoId: currentVideoId,
+				watchedSeconds: watched,
+				completed: false
+			})
+		}).catch(console.warn);
+	}
     }
 
     function handleVideoPlay() {
@@ -287,9 +387,28 @@
     }
 
     function handleVideoEnd() {
+        if (videoElement && currentVideoId) {
+            const finalWatched = Math.floor(videoElement.duration || 0);
+
+            fetch('/api/video-progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    videoId: currentVideoId,
+                    watchedSeconds: finalWatched,
+                    completed: true
+                })
+            }).catch(console.warn);
+        }
+
         currentPlayingVideoId = null;
         videoPaused = false;
         videoElement = null;
+
+        if (removeProgressListener) {
+            removeProgressListener();
+            removeProgressListener = null;
+        }
     }
 
     function handleVideoLoadStart() {
@@ -495,6 +614,7 @@
         }
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
+
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -666,7 +786,7 @@
             <div class="lg:flex-1 lg:min-w-0 space-y-8">
                 <!-- Video/Thumbnail Section -->
                 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
-                    <div class="aspect-video bg-gray-900 relative group">
+                    <div class="aspect-video relative group">
                         {#if selectedVideoUrl}
                             <video
                                 controls
@@ -694,14 +814,12 @@
                                     <div class="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
                                 {:else}
                                     <button
-                                            onclick={() =>
-                                                loadVideoFromFirstLesson(
-                                                    data.modules,
-                                                    (url) => selectedVideoUrl = url,
-                                                    (id) => loadingFileId = id,
-                                                    (id) => currentPlayingVideoId = id
-                                                )
+                                        onclick={() => {
+                                            const firstLesson = data.modules?.[0]?.lessons?.[0];
+                                            if (firstLesson?.fileId && firstLesson?.id) {
+                                                handleLessonClick(firstLesson.fileId, firstLesson.id);
                                             }
+                                        }}
                                         class="bg-white hover:bg-gray-100 rounded-full p-6 shadow-xl transition-all transform hover:scale-105">
                                         <Play class="w-8 h-8 text-gray-900 ml-1" />
                                     </button>
@@ -715,7 +833,13 @@
                         <div class="flex flex-wrap gap-6 text-sm text-gray-600">
                             <div class="flex items-center gap-2">
                                 <Clock class="w-4 h-4" />
-                                <span>{totalDuration}</span>
+                                <span>
+                                    {#if selectedVideoUrl && currentVideoDuration > 0}
+                                        {formatDuration(currentVideoDuration)}
+                                    {:else}
+                                        {totalDuration}
+                                    {/if}
+                                </span>
                             </div>
                             <div class="flex items-center gap-2">
                                 <BookOpen class="w-4 h-4" />
@@ -723,7 +847,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <Users class="w-4 h-4" />
-                                <span>0 students</span>
+                                <span>{data?.enrolledCount} students</span>
                             </div>
                         </div>
                     </div>
@@ -1035,12 +1159,14 @@
                                                         {/if}
 
                                                         <div
-                                                            role="presentation"
-                                                            class="group flex items-center justify-between p-4 rounded-xl transition-all duration-200 cursor-pointer w-full {isCurrentVideo 
-                                                                ? 'bg-blue-50 border-2 border-blue-200 shadow-sm' 
-                                                                : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'}"
-
-                                                        >
+                                                            class={`group flex items-center justify-between p-4 rounded-xl transition-all duration-200 cursor-pointer w-full 
+                                                                ${isCurrentVideo
+                                                                ? 'bg-blue-50 border-2 border-blue-200 shadow-sm'
+                                                                : (lesson.fileId && progressMap[lesson.id]?.completed)
+                                                                    ? 'border-b-4 border-2 border-b-blue-600 hover:shadow-sm'
+                                                                    : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                                                }`}
+                                                            >
                                                             <div class="flex items-center gap-4">
                                                                 <!-- Lesson Number & Icon -->
                                                                 <div class="flex items-center gap-3">
@@ -1130,17 +1256,22 @@
                                                                             </button>
                                                                         {/if}
                                                                     {:else}
-                                                                        <!-- Play Button -->
                                                                         <button
-                                                                            onclick={() => handleLessonClick(lesson.fileId ?? '')}
-                                                                            class="w-8 h-8 rounded-full flex items-center justify-center transition-all {isLoadingThis 
-                                                                                ? 'bg-gray-200 cursor-not-allowed' 
-                                                                                : 'bg-gray-100 hover:bg-blue-100 group-hover:bg-blue-100'}"
+                                                                            onclick={() => handleLessonClick(lesson.fileId ?? '', lesson.id)}
+                                                                            class={`w-8 h-8 rounded-full flex items-center justify-center transition-colors 
+                                                                                ${isLoadingThis
+                                                                                    ? 'bg-gray-200 cursor-not-allowed'
+                                                                                    : (lesson.fileId && progressMap[lesson.id]?.completed)
+                                                                                        ? 'bg-blue-100 hover:bg-blue-200'
+                                                                                        : 'bg-gray-100 hover:bg-blue-100 group-hover:bg-blue-100'
+                                                                                }`}
                                                                             disabled={isLoadingThis}
-                                                                            title="Play"
+                                                                            title={lesson.fileId && progressMap[lesson.id]?.completed ? 'Replay' : 'Play'}
                                                                         >
                                                                             {#if isLoadingThis}
                                                                                 <div class="w-4 h-4 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin"></div>
+                                                                            {:else if lesson.fileId && progressMap[lesson.id]?.completed}
+                                                                                <Repeat1 class="w-4 h-4 text-green-700" />
                                                                             {:else}
                                                                                 <Play class="w-4 h-4 text-gray-600 group-hover:text-blue-600 ml-0.5" />
                                                                             {/if}

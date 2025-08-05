@@ -1,7 +1,7 @@
 <script lang="ts">
     import * as Sidebar from "$lib/components/ui/sidebar";
     import { Button } from "$lib/components/ui/button";
-    import { BookOpenText, Cog, LayoutDashboard, ListVideo, LogOut, Menu } from "lucide-svelte";
+    import { BookOpenText, Cog, LayoutDashboard, ListVideo, LogOut, Menu, Users } from "lucide-svelte";
     import { signOut } from "@auth/sveltekit/client";
     import {
         Avatar,
@@ -21,7 +21,7 @@
         <Sidebar.Header>
             <div class="flex items-center ml-2">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center">
-                    <img alt="Vistora logo" src="favicon.png" class="text-white font-bold text-sm" />
+                    <img alt="Vistora logo" src="/favicon.png" class="text-white font-bold text-sm" />
                 </div>
                 <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                     istora
@@ -80,16 +80,24 @@
                             <ListVideo size={16}/>
                             Videos
                         </a>
+                        <a
+                            href="/dashboard/students"
+                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/students")}
+                        >
+                            <Users size={16}/>
+                            Students
+                        </a>
                     {/if}
                 
                     {#if user?.role === 'viewer'}
                         <a
-                            href="/dashboard/progress"
+                            href="/dashboard/my-courses"
                             class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
-                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/progress")}
+                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/my-courses")}
                         >
                             <LayoutDashboard size={16}/>
-                            Learning Progress
+                            My Courses
                         </a>
                         <a
                             href="/dashboard/favorites"
@@ -114,14 +122,6 @@
                         >
                             <BookOpenText size={16}/>
                             Learning History
-                        </a>
-                        <a
-                            href="/dashboard/achievements"
-                            class="flex px-4 py-2 text-sm rounded-md transition-colors items-center gap-2"
-                            class:bg-gray-100={page.url.pathname.startsWith("/dashboard/achievements")}
-                        >
-                            <LayoutDashboard size={16}/>
-                            Achievements
                         </a>
                     {/if}
 

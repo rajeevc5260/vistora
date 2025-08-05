@@ -30,18 +30,18 @@
       AvatarFallback,
     } from "$lib/components/ui/avatar";
     import { goto } from "$app/navigation";
+    import { toast } from "svelte-sonner";
   
     let { data }: PageProps = $props();
-    const user = data.session?.user;
   
     // Form states
     let profileForm = {
-      name: user?.name || "",
-      email: user?.email || "",
-      bio: "",
-      website: "",
-      phone: "",
-      location: ""
+      name: data.user?.name || "",
+      email: data.user?.email || "",
+      bio: data.user?.bio || "",
+      website: data.user?.website || "",
+      phone: data.user?.phone || "",
+      location: data.user?.location || ""
     };
   
     let notificationSettings = {
@@ -53,9 +53,9 @@
     };
   
     let billingInfo = {
-      plan: "Pro",
+      plan: "Free",
       billingCycle: "monthly",
-      nextBilling: "2024-08-15"
+      nextBilling: "2027-08-15"
     };
   
     let showCurrentPassword = $state(false)
@@ -66,11 +66,24 @@
       confirmPassword: ""
     };
   
-    function handleProfileSave() {
-      // Handle profile save logic
-      console.log("Profile saved:", profileForm);
+    async function handleProfileSave() {
+      try {
+        const res = await fetch('/api/user/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profileForm)
+        });
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Failed to update profile');
+
+        toast.success("Profile updated successfully!");
+      } catch (err) {
+        console.error("Profile update failed:", err);
+        toast.error("Failed to update profile.");
+      }
     }
-  
+
     function handleNotificationSave() {
       // Handle notification save logic
       console.log("Notifications saved:", notificationSettings);
@@ -167,11 +180,11 @@
               <div class="relative">
                 <Avatar class="w-20 h-20">
                   <AvatarImage
-                    src={user?.image ?? ""}
-                    alt={user?.name ?? "User"}
+                    src={data.user?.avatarUrl ?? ""}
+                    alt={data.user?.name ?? "User"}
                   />
                   <AvatarFallback class="text-xl">
-                    {user?.name?.[0] ?? "U"}
+                    {data.user?.name?.[0] ?? "U"}
                   </AvatarFallback>
                 </Avatar>
                 <button class="absolute -bottom-1 -right-1 p-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
@@ -182,11 +195,11 @@
                 <h3 class="font-medium text-gray-900">Profile Picture</h3>
                 <p class="text-sm text-gray-600 mb-2">JPG, PNG or GIF. Max size 2MB.</p>
                 <div class="flex gap-2">
-                  <Button variant="outline" size="sm" class="gap-2">
+                  <Button variant="outline" size="sm" class="gap-2 cursor-not-allowed" disabled>
                     <Upload class="w-4 h-4" />
                     Upload
                   </Button>
-                  <Button variant="outline" size="sm" class="gap-2">
+                  <Button variant="outline" size="sm" class="gap-2 cursor-not-allowed" disabled>
                     <Trash2 class="w-4 h-4" />
                     Remove
                   </Button>
@@ -286,7 +299,7 @@
                       Next billing: {billingInfo.nextBilling} • {billingInfo.billingCycle}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" disabled>
                     Change Plan
                   </Button>
                 </div>
@@ -308,14 +321,14 @@
                         </div>
                       </div>
                       <div class="flex gap-2">
-                        <Button variant="outline" size="sm">Edit</Button>
-                        <Button variant="outline" size="sm">Remove</Button>
+                        <Button variant="outline" size="sm" disabled>Edit</Button>
+                        <Button variant="outline" size="sm" disabled>Remove</Button>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
-              <Button variant="outline" class="mt-3 gap-2">
+              <Button variant="outline" class="mt-3 gap-2" disabled>
                 <CreditCard class="w-4 h-4" />
                 Add Payment Method
               </Button>
@@ -325,7 +338,7 @@
             <div>
               <div class="flex items-center justify-between mb-4">
                 <h3 class="font-medium text-gray-900">Billing History</h3>
-                <Button variant="outline" size="sm" class="gap-2">
+                <Button variant="outline" size="sm" class="gap-2" disabled>
                   <Download class="w-4 h-4" />
                   Download All
                 </Button>
@@ -335,14 +348,14 @@
                   <CardContent class="p-3">
                     <div class="flex items-center justify-between">
                       <div>
-                        <p class="font-medium text-gray-900">Pro Plan - July 2024</p>
-                        <p class="text-sm text-gray-600">Paid on July 15, 2024</p>
+                        <p class="font-medium text-gray-900">Free Plan</p>
+                        <p class="text-sm text-gray-600">Free plan till July 15, 2027</p>
                       </div>
                       <div class="flex items-center gap-3">
-                        <span class="font-medium text-gray-900">$29.00</span>
-                        <Button variant="outline" size="sm">
+                        <span class="font-medium text-gray-900">Renew Plan - $50.00</span>
+                        <!-- <Button variant="outline" size="sm">
                           <Download class="w-4 h-4" />
-                        </Button>
+                        </Button> -->
                       </div>
                     </div>
                   </CardContent>
@@ -353,7 +366,7 @@
         </Card>
   
         <!-- Notifications Section -->
-        <Card id="notifications">
+        <Card id="notifications" class="opacity-60">
           <CardHeader>
             <div class="flex items-center gap-3">
               <div class="p-2 bg-yellow-100 rounded-lg text-yellow-600">
@@ -376,7 +389,7 @@
                       <p class="text-sm text-gray-600">Receive email notifications for important updates</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" bind:checked={notificationSettings.emailNotifications} class="sr-only peer" />
+                      <input disabled type="checkbox" bind:checked={notificationSettings.emailNotifications} class="sr-only peer" />
                       <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
@@ -387,7 +400,7 @@
                       <p class="text-sm text-gray-600">Get notified when students interact with your courses</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" bind:checked={notificationSettings.courseUpdates} class="sr-only peer" />
+                      <input disabled type="checkbox" bind:checked={notificationSettings.courseUpdates} class="sr-only peer" />
                       <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
@@ -398,7 +411,7 @@
                       <p class="text-sm text-gray-600">Receive notifications when new students enroll</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" bind:checked={notificationSettings.studentEnrollments} class="sr-only peer" />
+                      <input disabled type="checkbox" bind:checked={notificationSettings.studentEnrollments} class="sr-only peer" />
                       <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
@@ -409,7 +422,7 @@
                       <p class="text-sm text-gray-600">Get weekly analytics and performance reports</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" bind:checked={notificationSettings.weeklyReports} class="sr-only peer" />
+                      <input disabled type="checkbox" bind:checked={notificationSettings.weeklyReports} class="sr-only peer" />
                       <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
@@ -420,7 +433,7 @@
                       <p class="text-sm text-gray-600">Receive updates about new features and promotions</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" bind:checked={notificationSettings.marketingEmails} class="sr-only peer" />
+                      <input disabled type="checkbox" bind:checked={notificationSettings.marketingEmails} class="sr-only peer" />
                       <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
@@ -430,7 +443,7 @@
             <Separator />
   
             <div class="flex justify-end">
-              <Button onclick={handleNotificationSave} class="gap-2">
+              <Button onclick={handleNotificationSave} class="gap-2" disabled>
                 <Save class="w-4 h-4" />
                 Save Preferences
               </Button>
@@ -524,7 +537,7 @@
             <Separator />
   
             <!-- Two-Factor Authentication -->
-            <Card class="bg-yellow-50 border-yellow-200">
+            <!-- <Card class="bg-yellow-50 border-yellow-200">
               <CardContent class="p-4">
                 <div class="flex items-center justify-between">
                   <div>
@@ -536,7 +549,7 @@
                   </Button>
                 </div>
               </CardContent>
-            </Card>
+            </Card> -->
   
             <!-- Danger Zone -->
             <Card class="bg-red-50 border-red-200">

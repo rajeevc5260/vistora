@@ -9,10 +9,8 @@ import { createSessionCookie, getSessionFromCookie } from '$lib/auth/session';
 const schema = z.object({
     title: z.string().min(1),
     description: z.string().optional(),
-    thumbnailBase64: z
-        .string()
-        .startsWith("data:image/")
-        .optional()
+    thumbnailFileId: z.string().optional(),
+    thumbnailName: z.string().optional()
 });
 
 export async function POST({ request, locals, cookies }) {
@@ -29,9 +27,6 @@ export async function POST({ request, locals, cookies }) {
         if (googleSession) session = googleSession;
     }
 
-    console.log("Session:", session);
-    console.log("Session user:", session?.user);
-
     if (!session || !session.user) {
         return new Response("Unauthorized", { status: 401 });
     }
@@ -43,17 +38,7 @@ export async function POST({ request, locals, cookies }) {
         return json({ error: 'Invalid input', issues: parsed.error.flatten() }, { status: 400 });
     }
 
-    const { title, description, thumbnailBase64 } = parsed.data;
-
-    function decodeBase64Image(base64: string) {
-        const matches = base64.match(/^data:(.+);base64,(.+)$/);
-        if (!matches || matches.length !== 3) throw new Error("Invalid base64");
-
-        const contentType = matches[1];
-        const buffer = Buffer.from(matches[2], "base64");
-
-        return { buffer, contentType };
-    }
+    const { title, description, thumbnailFileId, thumbnailName } = parsed.data;
 
     function slugify(text: string): string {
         return text
@@ -64,6 +49,7 @@ export async function POST({ request, locals, cookies }) {
     }
 
     const namespaceName = slugify(title);
+
     // Create Trelae namespace
     const namespace = await trelae.createNamespace({
         name: `${namespaceName}`,
@@ -71,62 +57,34 @@ export async function POST({ request, locals, cookies }) {
         isPublic: false
     });
 
-    console.log('Created Trelae namespace:', namespace);
-
     const namespaceId = namespace.getId();
 
-    console.log('Created Trelae namespace:', namespaceId);
-
-    let thumbnailFileId: string | undefined;
-
-    if (thumbnailBase64) {
-        const { buffer, contentType } = decodeBase64Image(thumbnailBase64);
-
-        const uploadRequest = await trelae
-            .namespace(namespaceId)
-            .getUploadUrl({
-                name: `${namespaceName}-thumbnail.png`,
-                location: `thumbnail`
-            });
-
-        console.log('Upload request:', uploadRequest);
-
-        await fetch(uploadRequest.uploadUrl, {
-            method: "PUT",
-            body: buffer,
-            headers: {
-                "Content-Type": contentType
-            }
-        });
-
-        thumbnailFileId = uploadRequest.id;
-        console.log('Thumbnail uploaded:', thumbnailFileId);
-    }
-
+    // Insert course
     const [course] = await db
         .insert(courses)
         .values({
             id: randomUUID(),
             title,
             description,
-            thumbnailFileId,
+            thumbnailFileId: thumbnailFileId || undefined,
             instructorId: session.user.id,
             namespaceId: namespaceId
         })
         .returning({ id: courses.id });
 
-    // insert thumbnail record if uploaded
-    if (thumbnailFileId) {
+    // Insert thumbnail record
+    if (thumbnailFileId && thumbnailName) {
         await db.insert(courseThumbnails).values({
-            name: `${namespaceName}-thumbnail.png`,
+            name: thumbnailName,
             courseId: course.id,
             fileId: thumbnailFileId,
-            location: 'thumbnail',
+            location: 'thumbnail'
         });
     }
 
     return json({ id: course.id });
 }
+
 
 
 export async function GET({ url, locals, cookies }) {

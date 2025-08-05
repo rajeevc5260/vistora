@@ -25,8 +25,6 @@
     let thumbnailBase64 = $state("");
     let thumbnailError = $state("");
 
-    // $inspect("thumbnailBase64", thumbnailBase64)
-
     let showPreview = $derived(
         thumbnailBase64 || (
             thumbnailUrl.startsWith("http://") ||
@@ -41,25 +39,64 @@
         }
 
         isSubmitting = true;
-        
+
         try {
-            console.log("Creating course with data svelte:", {
-                title,
-                description,
-                thumbnailUrl,
-            });
-            
+            let fileId: string | null = null;
+            let name: string | null = null;
+
+            // If thumbnail is selected or pasted
+            const file = fileInputRef?.files?.[0];
+            if (file || thumbnailUrl.trim()) {
+                let fileBlob: Blob;
+                let originalName: string;
+
+                if (file) {
+                    fileBlob = file;
+                    originalName = file.name;
+                } else {
+                    const res = await fetch(thumbnailUrl.trim());
+                    const contentType = res.headers.get('content-type') || 'image/jpeg';
+                    if (!contentType.startsWith('image/')) throw new Error('Invalid image URL');
+                    fileBlob = await res.blob();
+                    originalName = 'thumbnail.jpg';
+                }
+
+                name = `${crypto.randomUUID()}_${originalName}`;
+
+                // Get presigned upload URL
+                const presignRes = await fetch("/api/courses/get-upload-url", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name })
+                });
+
+                if (!presignRes.ok) throw new Error("Failed to get upload URL");
+                const { uploadUrl, id } = await presignRes.json();
+                fileId = id;
+
+                // Upload directly to Trelae
+                await fetch(uploadUrl, {
+                    method: 'PUT',
+                    body: fileBlob,
+                    headers: {
+                        'Content-Type': fileBlob.type
+                    }
+                });
+            }
+
+            // Now create the course
             const res = await fetch("/api/courses", {
                 method: "POST",
                 credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                },
                 body: JSON.stringify({
                     title,
                     description,
-                    thumbnailBase64: thumbnailBase64,
-                }),
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                    thumbnailFileId: fileId,
+                    thumbnailName: name,
+                })
             });
 
             if (res.ok) {
@@ -69,12 +106,14 @@
             } else {
                 toast.error("Failed to create course");
             }
-        } catch (error) {
+        } catch (err) {
+            console.error(err);
             toast.error("An error occurred while creating the course");
         } finally {
             isSubmitting = false;
         }
     }
+
 
     function goBack() {
         goto("/dashboard/courses");

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '$lib/server/db';
 import { videoProgress } from '$lib/server/db/schema';
 import { getSessionFromCookie } from '$lib/auth/session';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 const schema = z.object({
     videoId: z.string().uuid(),
@@ -49,7 +49,7 @@ export async function POST({ request, cookies, locals }) {
             target: [videoProgress.userId, videoProgress.videoId],
             set: {
                 watchedSeconds,
-                completed: completed ?? false,
+                completed: sql`video_progress.completed OR ${completed ?? false}`,
                 lastWatchedAt: new Date()
             }
         });

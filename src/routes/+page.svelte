@@ -19,7 +19,7 @@
             <!-- Badge -->
             <div class="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-blue-200 rounded-full px-4 py-2 mb-8 shadow-sm">
                 <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span class="text-sm font-medium text-gray-700">Now Available</span>
+                <span class="text-sm font-medium text-gray-700">Enterprise-Ready Learning Platform</span>
             </div>
 
             <h1 class="text-6xl md:text-7xl font-extrabold leading-tight tracking-tight text-gray-900 mb-6">
@@ -38,14 +38,14 @@
             <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 {#if !data.session}
                     <Button 
-                        class="text-lg px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                        class="text-lg px-8 py-5 bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                         onclick={() => goto("/login")}
                     >
                         Get Started Free
                     </Button>
                     <Button 
                         variant="outline" 
-                        class="text-lg px-8 py-4 border-2 border-gray-300 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300"
+                        class="text-lg px-8 p-5 border-2 border-gray-300 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300"
                         onclick={() => goto("#features")}
                     >
                         Learn More
@@ -174,7 +174,7 @@
                         <div class="text-gray-600">Videos Delivered</div>
                     </div>
                     <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">1M+</div>
+                        <div class="text-3xl font-bold text-blue-600 mb-2">1K</div>
                         <div class="text-gray-600">Students Reached</div>
                     </div>
                 </div>

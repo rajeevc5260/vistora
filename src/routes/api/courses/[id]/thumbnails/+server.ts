@@ -64,8 +64,8 @@ export async function GET({ params, url }) {
 
 
 const schema = z.object({
-    thumbnailBase64: z.string().startsWith('data:image/'),
-    name: z.string().optional()
+    fileId: z.string(),
+    name: z.string()
 });
 
 export async function POST({ request, params, locals, cookies }) {
@@ -76,76 +76,38 @@ export async function POST({ request, params, locals, cookies }) {
 		const decoded = await getSessionFromCookie(authCookie);
 		if (decoded) session = { user: decoded };
 	}
-
 	if (!session && locals.auth) {
 		const googleSession = await locals.auth();
 		if (googleSession) session = googleSession;
 	}
+	if (!session || !session.user) {
+		return new Response("Unauthorized", { status: 401 });
+	}
 
-    if (!session || !session.user) {
-        return new Response("Unauthorized", { status: 401 });
-    }
+	const courseId = params.id;
+	const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
+	if (!course) {
+		return json({ error: "Course not found" }, { status: 404 });
+	}
 
-    const courseId = params.id;
-    const [course] = await db.select().from(courses).where(eq(courses.id, courseId));
-    if (!course) {
-        return json({ error: "Course not found" }, { status: 404 });
-    }
+	const body = await request.json();
+	const parsed = schema.safeParse(body);
+	if (!parsed.success) {
+		return json({ error: 'Invalid input', issues: parsed.error.flatten() }, { status: 400 });
+	}
 
-    const body = await request.json();
-    const parsed = schema.safeParse(body);
-    if (!parsed.success) {
-        return json({ error: 'Invalid input', issues: parsed.error.flatten() }, { status: 400 });
-    }
+	const { fileId, name } = parsed.data;
 
-    const { thumbnailBase64, name } = parsed.data;
+	await db.insert(courseThumbnails).values({
+		name,
+		fileId,
+		courseId: course.id,
+		location: 'thumbnail'
+	});
 
-    function decodeBase64Image(base64: string) {
-        const matches = base64.match(/^data:(.+);base64,(.+)$/);
-        if (!matches || matches.length !== 3) throw new Error("Invalid base64");
-
-        const contentType = matches[1];
-        const buffer = Buffer.from(matches[2], "base64");
-        return { buffer, contentType };
-    }
-
-    function slugify(text: string): string {
-        return text
-            .toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
-    }
-
-    const courseName = slugify(course.title);
-
-    const { buffer, contentType } = decodeBase64Image(thumbnailBase64);
-    const filename = name || `${courseName}-thumbnail-${Date.now()}`;
-
-    const uploadRequest = await trelae
-        .namespace(course.namespaceId)
-        .getUploadUrl({
-            name: filename,
-            location: 'thumbnail'
-        });
-
-    await fetch(uploadRequest.uploadUrl, {
-        method: 'PUT',
-        body: buffer,
-        headers: {
-            'Content-Type': contentType
-        }
-    });
-
-    await db.insert(courseThumbnails).values({
-        name: filename,
-        fileId: uploadRequest.id,
-        courseId: course.id,
-        location: 'thumbnail'
-    });
-
-    return json({ success: true });
+	return json({ success: true });
 }
+
 
 export async function PUT({ request, params, locals, cookies}) {
 	const authCookie = cookies.get('auth');

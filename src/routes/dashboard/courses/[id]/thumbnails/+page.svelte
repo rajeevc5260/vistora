@@ -19,7 +19,6 @@
 	let offset = $state(0);
 	const limit = 20;
 
-    $inspect("thumbnails", thumbnails)
 	let searchQuery = $state('');
 	let searchTimeout: NodeJS.Timeout | null = null;
 	let isSearching = $state(false);
@@ -154,33 +153,70 @@
     let uploading = $state(false);
 
     async function uploadThumbnail() {
-        if (!newThumbnailBase64) return;
-	    uploading = true;
+        uploading = true;
+        const file = fileInputRef?.files?.[0];
+        const uuid = crypto.randomUUID();
+        const originalName = newThumbnailName || (file?.name ?? 'thumbnail.jpg');
+        const fileName = `${uuid}_${originalName}`;
 
         try {
-            const res = await fetch(`/api/courses/${course.id}/thumbnails`, {
+            let fileBlob: Blob | null = null;
+
+            if (file) {
+                fileBlob = file;
+            } else if (newThumbnailUrl.trim()) {
+                // Fetch image from the URL as blob
+                const res = await fetch(newThumbnailUrl.trim());
+                const contentType = res.headers.get('content-type') || 'image/jpeg';
+                if (!contentType.startsWith('image/')) throw new Error('Invalid image URL');
+                fileBlob = await res.blob();
+            } else {
+                throw new Error('No file or image URL provided');
+            }
+
+            // 1. Request presigned upload URL
+            const res = await fetch(`/api/courses/${course.id}/thumbnails/get-upload-url`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ thumbnailBase64: newThumbnailBase64, name: newThumbnailName })
+                body: JSON.stringify({ name: fileName })
             });
-            if (res.ok) {
-                newThumbnailBase64 = '';
-                newThumbnailUrl = '';
+
+            if (!res.ok) throw new Error("Failed to get upload URL");
+            const { uploadUrl, id: fileId } = await res.json();
+
+            // 2. Upload the file blob
+            await fetch(uploadUrl, {
+                method: 'PUT',
+                body: fileBlob,
+                headers: {
+                    'Content-Type': fileBlob.type
+                }
+            });
+
+            // 3. Notify backend with fileId and name
+            const notifyRes = await fetch(`/api/courses/${course.id}/thumbnails`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileId, name: originalName })
+            });
+
+            if (notifyRes.ok) {
                 offset = 0;
                 endReached = false;
-                setTimeout(() => {
-                    offset = 0;
-                    endReached = false;
-                    loadThumbnails();
-                    toast.success("New Thumbnail uploaded successfully")
-                }, 2000);
+                loadThumbnails();
+                toast.success("New Thumbnail uploaded successfully");
                 dialogOpen = false;
+            } else {
+                throw new Error("Failed to save thumbnail record");
             }
         } catch (e) {
-            console.error('Thumbnail upload failed', e);
-            toast.error('Thumbnail upload failed')
+            console.error('Thumbnail upload failed:', e);
+            toast.error('Thumbnail upload failed');
+        } finally {
+            uploading = false;
         }
     }
+
     const fallbackImage = "https://placehold.co/640x360?text=Thumbnail+Preview";
 
     // delete thumbnail
@@ -290,7 +326,7 @@
                         <!-- Actions -->
                         <div class="mt-6 flex justify-end gap-3">
                             <Button variant="secondary" onclick={() => dialogOpen = false}>Cancel</Button>
-                            <Button onclick={uploadThumbnail} disabled={!newThumbnailBase64}>
+                            <Button onclick={uploadThumbnail}>
                                 {#if uploading}
                                     <div class="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                                     Uploading...
