@@ -352,7 +352,7 @@
                 <div
                     class="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"
                 ></div>
-                <span>Loading more courses...</span>
+                <span>Loading courses...</span>
             </div>
         </div>
     {:else if endReached && courses.length > 0}

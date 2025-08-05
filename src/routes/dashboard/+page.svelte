@@ -289,7 +289,7 @@
       <div class="grid md:grid-cols-3 gap-6">
         <div
           role="presentation"
-          onclick={() => goto("/dashboard/progress")}
+          onclick={() => goto("/dashboard/my-courses")}
           class="group rounded-xl border border-gray-200 p-6 bg-white hover:shadow-lg hover:border-blue-200 transition-all duration-300 cursor-pointer"
         >
           <div class="flex items-center gap-3 mb-3">

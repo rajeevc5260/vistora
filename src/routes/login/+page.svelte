@@ -15,7 +15,7 @@
 </script>
 
 <div
-    class="min-h-screen flex flex-col justify-center items-center text-center px-4"
+    class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50  flex flex-col justify-center items-center text-center px-4"
 >
     <div class="max-w-md space-y-6 flex flex-col">
         <h1 class="text-4xl font-bold text-gray-900">Welcome to Vistora</h1>

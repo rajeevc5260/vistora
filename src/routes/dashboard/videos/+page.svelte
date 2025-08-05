@@ -428,7 +428,7 @@
         <div class="text-center py-8">
             <div class="inline-flex items-center gap-2 text-gray-500">
                 <div class="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                <span>Loading more videos...</span>
+                <span>Loading videos...</span>
             </div>
         </div>
     {:else if (endReached || searchEndReached) && videos.length > 0}
