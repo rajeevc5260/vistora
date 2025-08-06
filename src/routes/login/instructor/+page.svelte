@@ -184,14 +184,14 @@
                 </div>
 
                 <!-- Forgot Password -->
-                <div class="text-center">
+                <!-- <div class="text-center">
                     <a
                         href="/auth/forgot-password"
                         class="text-sm text-gray-500 hover:text-gray-700 transition-colors"
                     >
                         Forgot your password?
                     </a>
-                </div>
+                </div> -->
             </CardContent>
         </Card>
 
