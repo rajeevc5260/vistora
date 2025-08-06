@@ -621,11 +621,11 @@
     <!-- Header -->
     <div class="bg-white border-b sticky top-0 z-10">
         <div class="max-w-7xl mx-auto px-4 lg:px-0">
-            <div class="flex items-center justify-between py-4">
+            <div class="items-center justify-between py-4 lg:flex">
                 <div class="flex items-center gap-4">
                     <Button variant="ghost" onclick={goBack} class="gap-2">
                         <ArrowLeft class="w-4 h-4" />
-                        Back to Courses
+                        <p class="hidden lg:block">Back to Courses</p>
                     </Button>
                     <div class="h-6 w-px bg-gray-300"></div>
                     <h1 class="text-xl font-semibold text-gray-900 truncate">

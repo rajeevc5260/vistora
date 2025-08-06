@@ -32,10 +32,10 @@
 <div class="max-w-6xl mx-auto space-y-8 px-4 lg:px-0">
   <!-- Welcome Card -->
   <div
-    class="rounded-2xl border shadow-sm p-6 bg-white flex items-center gap-6"
+    class="rounded-2xl border shadow-sm p-4 sm:p-6 bg-white flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6"
   >
-    <div class="relative">
-      <Avatar class="w-16 h-16">
+    <div class="relative flex-shrink-0">
+      <Avatar class="w-12 h-12 sm:w-16 sm:h-16">
           <AvatarImage
               src={user?.image ?? ""}
               alt={user?.name ?? "User"}
@@ -45,34 +45,37 @@
           >
       </Avatar>
       <div
-        class="absolute -bottom-0 -right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"
+        class="absolute -bottom-0 -right-0 w-3 h-3 sm:w-4 sm:h-4 bg-green-500 border-2 border-white rounded-full"
       ></div>
     </div>
 
-    <div class="flex-1">
-      <h2 class="text-xl font-semibold text-gray-900 mb-1">
+    <div class="flex-1 min-w-0">
+      <h2 class="text-lg sm:text-xl font-semibold text-gray-900 mb-1 truncate">
         Welcome back, {user?.name ?? "User"} 👋
       </h2>
-      <p class="text-gray-600">{user?.email}</p>
+      <p class="text-sm sm:text-base text-gray-600 truncate mb-2 sm:mb-0">{user?.email}</p>
       <div class="flex items-center gap-2 mt-2">
-        <span class="px-2 py-1 bg-{userRole === 'instructor' ? 'blue' : 'emerald'}-100 text-{userRole === 'instructor' ? 'blue' : 'emerald'}-800 text-xs font-medium rounded-full">
+        <span class="px-2 py-1 text-xs font-medium rounded-full {userRole === 'instructor' 
+          ? 'bg-blue-100 text-blue-800' 
+          : 'bg-emerald-100 text-emerald-800'}">
           {userRole === 'instructor' ? 'Instructor' : 'Student'}
         </span>
       </div>
     </div>
 
     <!-- Sign out button -->
-    <Button
-      variant="outline"
-      size="sm"
-      onclick={logout}
-      class="gap-2 flex items-center hover:bg-gray-50"
-    >
-      <LogOut class="w-4 h-4" />
-      Sign Out
-    </Button>
+    <div class="w-full sm:w-auto flex-shrink-0">
+      <Button
+        variant="outline"
+        size="sm"
+        onclick={logout}
+        class="gap-2 flex items-center justify-center hover:bg-gray-50 w-full sm:w-auto"
+      >
+        <LogOut class="w-4 h-4" />
+        <span class="sm:inline">Sign Out</span>
+      </Button>
+    </div>
   </div>
-
   {#if userRole === 'instructor'}
     <!-- Instructor Dashboard -->
     <div class="space-y-6">
