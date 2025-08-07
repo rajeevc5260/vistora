@@ -152,9 +152,9 @@
         </Sidebar.Footer>
     </Sidebar.Root>
 
-    <Sidebar.Trigger  class="sticky top-0"/>
+    <Sidebar.Trigger  class="md:sticky fixed top-0"/>
 
-    <main class="flex-1 overflow-auto pl-2 pr-4 py-10">
+    <main class="flex-1 overflow-auto md:pr-4 py-10">
         {@render children?.()}
     </main>
 </Sidebar.Provider>
