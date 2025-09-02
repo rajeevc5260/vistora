@@ -98,7 +98,7 @@ export async function GET({ url, locals, cookies }) {
 			try {
 				if (course.thumbnailFileId) {
 					const file = trelae.file(course.thumbnailFileId);
-					thumbnailUrl = await file.getDownloadUrl({ expire: 600 });
+					thumbnailUrl = await file.getDownloadUrl();
 				}
 			} catch (err) {
 				console.warn(`Thumbnail fetch failed for course ${course.id}`, err);

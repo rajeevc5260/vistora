@@ -78,7 +78,7 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
                     try {
                         thumbnailUrl = await trelae
                             .file(video.courseThumbnailFileId)
-                            .getDownloadUrl({ expire: 2400 });
+                            .getDownloadUrl();
                     } catch (err) {
                         console.error(`Failed to fetch thumbnail for ${video.courseThumbnailFileId}`, err);
                     }

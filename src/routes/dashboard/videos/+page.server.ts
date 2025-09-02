@@ -61,7 +61,7 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 				let thumbnailUrl: string | null = null;
 				if (video.courseThumbnailFileId) {
 					try {
-						thumbnailUrl = await trelae.file(video.courseThumbnailFileId).getDownloadUrl({ expire: 2400 });
+						thumbnailUrl = await trelae.file(video.courseThumbnailFileId).getDownloadUrl();
 					} catch (e) {
 						console.error('Failed to get thumbnail URL:', e);
 					}

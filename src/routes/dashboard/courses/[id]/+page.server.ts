@@ -57,7 +57,7 @@ export const load: PageServerLoad = async ({ params, cookies, locals }) => {
 	if (rawCourse.thumbnailFileId) {
 		try {
 			const file = trelae.file(rawCourse.thumbnailFileId);
-			thumbnailUrl = await file.getDownloadUrl({ expire: 600 });
+			thumbnailUrl = await file.getDownloadUrl();
 		} catch (error) {
 			console.warn(`Error generating thumbnail URL:`, error);
 		}

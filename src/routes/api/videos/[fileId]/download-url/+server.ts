@@ -3,6 +3,6 @@ import { trelae } from '$lib/utils/trelae';
 
 export async function GET({ params }) {
 	const file = trelae.file(params.fileId);
-	const url = await file.getDownloadUrl({ expire: 2400 });
+	const url = await file.getDownloadUrl();
 	return json({ url });
 }

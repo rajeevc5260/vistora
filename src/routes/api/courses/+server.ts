@@ -140,7 +140,7 @@ export async function GET({ url, locals, cookies }) {
 			if (course.thumbnailFileId) {
 				try {
 					const file = trelae.file(course.thumbnailFileId);
-					thumbnailUrl = await file.getDownloadUrl({ expire: 600 });
+					thumbnailUrl = await file.getDownloadUrl();
 				} catch (err) {
 					console.warn(`Thumbnail fetch failed for course ${course.id}`, err);
 				}
