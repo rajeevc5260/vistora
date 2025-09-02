@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Button } from "$lib/components/ui/button";
     import { goto } from "$app/navigation";
+    import { fly, fade } from 'svelte/transition';
     import type { PageProps } from "./$types";
     let { data }: PageProps = $props();
     let activeTab = $state<"dashboard" | "course">("dashboard");
@@ -136,10 +137,12 @@
                             src="/productImage.png"
                             alt="Vistora dashboard screenshot"
                             loading="lazy"
+                            in:fade={{ duration: 300 }} out:fade={{ duration: 200 }}
                             class="block w-full h-auto"
                         />
                     {:else}
                         <img
+                            in:fade={{ duration: 300 }} out:fade={{ duration: 200 }}
                             src="/course-player.png"
                             alt="Vistora course player screenshot"
                             loading="lazy"
