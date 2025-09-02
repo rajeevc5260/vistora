@@ -19,14 +19,14 @@
 <Sidebar.Provider>
     <Sidebar.Root>
         <Sidebar.Header>
-            <div class="flex items-center ml-2">
+            <a href="/dashboard" class="flex items-center ml-2">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center">
                     <img alt="Vistora logo" src="/favicon.png" class="text-white font-bold text-sm" />
                 </div>
                 <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                     istora
                 </h1>
-            </div>
+            </a>
         </Sidebar.Header>
         <Sidebar.Content class="flex flex-col justify-between h-full">
             <div class="space-y-4">

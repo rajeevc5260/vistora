@@ -14,6 +14,11 @@
     });
 </script>
 
+<svelte:head>
+    <title>Login — Vistora</title>
+    <meta name="description" content="Sign in to Vistora to access your dashboard and learning tools." />
+</svelte:head>
+
 <div
     class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50  flex flex-col justify-center items-center text-center px-4"
 >

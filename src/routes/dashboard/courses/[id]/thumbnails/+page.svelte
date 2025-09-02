@@ -270,6 +270,11 @@
 
 </script>
 
+<svelte:head>
+    <title>Course Thumbnails — Vistora Dashboard</title>
+    <meta name="description" content="Manage and upload course thumbnails for your Vistora course." />
+</svelte:head>
+
 <div class="min-h-screen bg-gray-50">
 	<!-- Header -->
 	<div class="bg-white border-b sticky top-0 z-10">

@@ -101,6 +101,11 @@
       }
     }
   </script>
+
+  <svelte:head>
+    <title>Settings — Vistora Dashboard</title>
+    <meta name="description" content="Manage your Vistora account profile, billing, notifications, and security settings." />
+  </svelte:head>
   
   <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
     <!-- Header Section -->
@@ -187,8 +192,8 @@
                     {data.user?.name?.[0] ?? "U"}
                   </AvatarFallback>
                 </Avatar>
-                <button class="absolute -bottom-1 -right-1 p-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
-                  <Edit class="w-3 h-3" />
+                <button disabled class="absolute -bottom-1 -right-1 p-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors">
+                  <Edit class="w-3 h-3 cursor-not-allowed" />
                 </button>
               </div>
               <div>
@@ -273,7 +278,7 @@
         </Card>
   
         <!-- Billing Section -->
-        <Card id="billing">
+        <Card id="billing" class="opacity-60">
           <CardHeader>
             <div class="flex items-center gap-3">
               <div class="p-2 bg-green-100 rounded-lg text-green-600">

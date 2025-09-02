@@ -46,6 +46,11 @@
 	}
 </script>
 
+<svelte:head>
+    <title>Students — Vistora Dashboard</title>
+    <meta name="description" content="View and search enrolled students across your Vistora courses." />
+</svelte:head>
+
 <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

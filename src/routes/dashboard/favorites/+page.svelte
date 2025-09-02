@@ -177,6 +177,11 @@
     }
 </script>
 
+<svelte:head>
+    <title>Favorites — Vistora Dashboard</title>
+    <meta name="description" content="Review and manage your favorited courses on the Vistora dashboard." />
+</svelte:head>
+
 <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
     <div
         class="flex flex-col md:flex-row md:items-center justify-between gap-4"

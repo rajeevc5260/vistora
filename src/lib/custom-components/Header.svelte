@@ -31,14 +31,14 @@
 >
     <div class="max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 py-4">
         <!-- Logo -->
-        <div class="flex items-center ml-2">
+        <a href="/" class="flex items-center ml-2">
             <div class="w-8 h-8 rounded-lg flex items-center justify-center">
                 <img alt="Vistora logo" src="/favicon.png" class="text-white font-bold text-sm" />
             </div>
             <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                 istora
             </h1>
-        </div>
+        </a>
 
         <!-- Desktop Navigation -->
         <nav class="hidden md:flex items-center space-x-4">

@@ -29,6 +29,11 @@
   const userRole = user?.role || 'viewer'; // Default to viewer if no role specified
 </script>
 
+<svelte:head>
+  <title>Dashboard — Vistora</title>
+  <meta name="description" content="Overview of your courses, videos, students, and learning progress on Vistora." />
+</svelte:head>
+
 <div class="max-w-6xl mx-auto space-y-8 px-4 lg:px-0">
   <!-- Welcome Card -->
   <div

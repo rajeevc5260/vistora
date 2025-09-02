@@ -180,6 +180,11 @@
     });
 </script>
 
+<svelte:head>
+    <title>Create Course — Vistora Dashboard</title>
+    <meta name="description" content="Create a new course on Vistora. Add a title, description, and thumbnail to get started." />
+</svelte:head>
+
 <div class="min-h-screen bg-gray-50">
     <!-- Header -->
     <div class="bg-white border-b">

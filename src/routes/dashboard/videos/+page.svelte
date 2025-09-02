@@ -207,6 +207,11 @@
     }
 </script>
 
+<svelte:head>
+    <title>Video Library — Vistora Dashboard</title>
+    <meta name="description" content="Manage your uploaded videos, search, and organize media assets on Vistora." />
+</svelte:head>
+
 <div class="max-w-7xl mx-auto space-y-8 px-4 lg:px-0">
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">

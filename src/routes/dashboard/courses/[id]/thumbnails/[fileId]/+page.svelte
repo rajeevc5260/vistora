@@ -320,6 +320,11 @@
 
 </script>
 
+<svelte:head>
+    <title>{data.course.title} — Thumbnail Editor — Vistora</title>
+    <meta name="description" content={`Edit and optimize a thumbnail for the course ${data.course.title} on Vistora.`} />
+</svelte:head>
+
 <div class="min-h-screen bg-gray-50">
 	<!-- Header -->
 	<div class="bg-white border-b sticky top-0 z-10">

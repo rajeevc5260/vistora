@@ -79,6 +79,11 @@
     }
 </script>
 
+<svelte:head>
+    <title>Sign Up as Instructor — Vistora</title>
+    <meta name="description" content="Create your instructor account on Vistora and start publishing courses." />
+</svelte:head>
+
 <div
     class="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 flex items-center justify-center p-4"
 >
